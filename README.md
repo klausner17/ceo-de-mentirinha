@@ -42,8 +42,9 @@ Variáveis de ambiente:
 
 | No jogo | No Claude Code |
 | --- | --- |
-| Hall de entrada | mapa do Tiled (`assets/mapa/escritorio.json`): porta, estante de skills, fichário, café e a Sala do CEO (você) |
-| Ala | projeto (`cwd`) |
+| Casa | o escritório é uma casa: o hall de entrada em cima e um corredor central descendo dele, com os cômodos dos dois lados |
+| Hall de entrada | mapa do Tiled (`assets/mapa/escritorio.json`): porta da rua, estante de skills, fichário, café e a Sala do CEO (você), ligada ao hall por uma porta |
+| Ala (cômodo) | projeto (`cwd`), com uma porta para o corredor; com número ímpar de projetos, o último par ganha uma sala livre |
 | Mesa | sessão ativa, ordenada por branch dentro da ala |
 | Cor da roupa | modelo: Opus = diretor (roxo), Sonnet = pleno (azul), Haiku = júnior (verde-água) |
 | Pose e monitor | ferramenta em uso: digitando (Edit, Bash), lendo uma pasta (Read, Web), lupa (Grep, Glob), apontando (Agent) |
@@ -53,7 +54,7 @@ Variáveis de ambiente:
 | Suor, café e papel rosado | contexto acima de 80% do limite |
 | Monitor vermelho, papel amassado e fumaça | uma ferramenta voltou com erro |
 | Dormindo com Z | sem escrita há `CEO_IDLE_MINUTES` |
-| Liderados | subagentes: entram pela porta do hall, ficam ao lado do chefe e saem pela porta ao terminar |
+| Liderados | subagentes: entram pela porta da rua, atravessam o hall e o corredor, entram pela porta da ala, ficam ao lado do chefe e fazem o caminho de volta ao terminar |
 | Office boys na portaria | chamadas a conectores MCP: cada chamada sai da mesa e entra na fila do servidor na portaria. Volta com envelope se deu certo, ou de mãos vazias e perdido se falhou |
 | Log no rodapé | quem chegou, quem saiu e mudanças de ferramenta |
 

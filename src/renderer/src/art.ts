@@ -39,7 +39,10 @@ export const SCREEN: Record<Screen, number> = { desligado: 0, codigo: 1, termina
 export const ITEM = { papel: 0, amassado: 1, fumaca: 2, postit: 3, cafe: 4, suor: 5, z: 6, planta: 7, cadeira: 8, envelope: 9, interrogacao: 10 } as const
 
 /** Índices do tileset (iguais aos do script; no Tiled o gid é índice + 1). */
-export const TILES = { carpete: 0, carpeteB: 1, madeira: 2, paredeTopo: 3, parede: 4, porta: 5, janela: 6, quadro: 14, piso: 15 } as const
+export const TILES = {
+  carpete: 0, carpeteB: 1, madeira: 2, paredeTopo: 3, parede: 4, porta: 5, janela: 6, tapete: 7,
+  planta: 8, sofaE: 10, sofaD: 11, quadro: 14, piso: 15, paredeLado: 16, batente: 17
+} as const
 
 export const personKey = (s: Seniority) => `funcionario-${s}`
 export const animKey = (s: Seniority, pose: Pose) => `${s}-${pose}`
