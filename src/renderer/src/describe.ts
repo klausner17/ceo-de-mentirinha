@@ -52,17 +52,20 @@ function plural(n: number, one: string, many: string): string {
 
 /** O que a pessoa está fazendo agora, numa frase. */
 export function doing(s: SessionState, now: number): string {
-  if (s.status === 'ocioso') return `Esperando você ${ago(s.lastActivity, now)}`
+  const a = s.awaiting
+  if (a?.reason === 'permissao') return `Pedindo sua permissão ${ago(a.since, now)}`
+  if (a?.reason === 'pergunta') return `Esperando sua resposta ${ago(a.since, now)}`
+  if (s.status === 'ocioso' || a) return `Esperando você ${ago(a?.since ?? s.lastActivity, now)}`
   if (s.currentTool) return `${describeTool(s.currentTool.name).label} ${ago(s.currentTool.startedAt, now)}`
   return 'Pensando…'
 }
 
 /**
  * A linha de baixo da plaquinha. Trabalhando: o pedido em que está (o balão já diz a
- * ferramenta). Parado: há quanto tempo espera você.
+ * ferramenta). Parado ou esperando o CEO: há quanto tempo espera você.
  */
 export function deskLine(s: SessionState, now: number): string {
-  if (s.status === 'ocioso') return doing(s, now)
+  if (s.status === 'ocioso' || s.awaiting) return doing(s, now)
   const team = s.subagents.length > 0 ? ` · ${plural(s.subagents.length, 'ajudante', 'ajudantes')}` : ''
   if (s.lastPrompt) return `“${cut(s.lastPrompt, 60)}”${team}`
   return `${s.currentTool ? 'Trabalhando' : 'Pensando…'}${team}`

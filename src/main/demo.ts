@@ -31,12 +31,14 @@ function demoMcp(step: number, server: string, from: number, to: number, ok: boo
 
 /** Estado das sessões falsas no passo `step` (um passo a cada poucos segundos). */
 export function demoSessions(now: number, step = 0, start = now): SessionState[] {
-  const base = { mcpCalls: [], mcpResults: [], outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null, startedAt: start - 40 * 60_000 }
+  const base = { mcpCalls: [], mcpResults: [], outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null, startedAt: start - 40 * 60_000, awaiting: null }
   // Os liderados chegam no passo 2 e vão embora no passo 7 de cada ciclo de 10.
   const cycle = step % 10
   const jiraA = demoMcp(step, 'jira', 1, 4, true, start)
   const jiraB = demoMcp(step, 'jira', 2, 6, true, start)
   const drive = demoMcp(step, 'claude_ai_Google_Drive', 3, 6, false, start)
+  // O pleno pede permissão para rodar um comando no fim de cada ciclo: email no computador do CEO.
+  const asking = cycle >= 8
   const team = cycle >= 2 && cycle < 7 ? [sub('a1', 'Explore', 'claude-haiku-5-5', true, now), sub('a2', 'general-purpose', 'claude-sonnet-5-5', cycle % 2 === 0, now)] : []
   return [
     {
@@ -68,7 +70,8 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       title: 'Cupom de desconto',
       lastPrompt: 'Adiciona cupom de desconto no carrinho',
       contextTokens: 40_000,
-      currentTool: tool(PLENO_TOOLS[step % PLENO_TOOLS.length]!, now),
+      currentTool: asking ? { id: `Bash-${step - cycle}`, name: 'Bash', startedAt: start + (step - cycle + 8) * 3000 } : tool(PLENO_TOOLS[step % PLENO_TOOLS.length]!, now),
+      awaiting: asking ? { reason: 'permissao', since: start + (step - cycle + 8) * 3000, detail: 'Bash' } : null,
       // Um teste falha a cada ciclo: papel amassado e fumaça.
       lastErrorAt: cycle >= 4 ? start + (step - cycle + 4) * 3000 : null,
       lastActivity: now,
@@ -89,8 +92,9 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       lastPrompt: 'Corrige os erros de digitação do último post',
       contextTokens: 8_000,
       currentTool: null,
-      lastActivity: now - 20 * 60_000,
+      lastActivity: start - 20 * 60_000,
       status: 'ocioso',
+      awaiting: { reason: 'relatorio', since: start - 20 * 60_000, detail: null },
       subagents: []
     }
   ]

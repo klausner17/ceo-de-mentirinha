@@ -1,7 +1,7 @@
 // Estado de todas as sessões. Recebe linhas e registros, decide quem está no
 // escritório e emite só o que mudou. Não toca em arquivos: o watcher alimenta.
 
-import type { OfficeDelta, SessionState, SubagentState } from '@shared/types'
+import type { Awaiting, OfficeDelta, SessionState, SubagentState } from '@shared/types'
 import { AgentTracker, seniorityFor } from './agent-tracker'
 import { parseLine, type TranscriptEvent } from './parser'
 import { projectName } from './paths'
@@ -45,7 +45,12 @@ interface RegistryEntry {
   name: string | null
   /** Origem do nome: `user`, `peer`, `hook`, `auto`, `derived` (pasta + número), `collision`. */
   nameSource: string | null
+  /** `busy` durante um turno, `idle` esperando o próximo pedido, `waiting` esperando a pessoa. */
   status: string | null
+  /** Com `status: "waiting"`: `permission prompt`, `input needed`, `dialog open`… */
+  waitingFor: string | null
+  /** Quando o status mudou (epoch em ms). */
+  statusUpdatedAt: number | null
 }
 
 /** Nomes do registro de processos que alguém escolheu de propósito. */
@@ -66,6 +71,40 @@ export function sessionName(main: AgentTracker, reg: Pick<RegistryEntry, 'name' 
   const prompt = main.firstPrompt
   const fromPrompt = prompt && (prompt.length > PROMPT_NAME_MAX ? `${prompt.slice(0, PROMPT_NAME_MAX - 1).trimEnd()}…` : prompt)
   return t.custom ?? chosen ?? t.agent ?? t.ai ?? t.summary ?? auto ?? fromPrompt ?? regName ?? null
+}
+
+/** Ferramentas que são uma pergunta para a pessoa, e não trabalho. */
+const QUESTION_TOOLS = new Set(['AskUserQuestion'])
+/** Ferramentas de delegação: a permissão pedida costuma ser de um subagente. */
+const DELEGATION_TOOLS = new Set(['Agent', 'Task'])
+
+/**
+ * Se a sessão está esperando o CEO, e por quê. O sinal mais confiável é o registro de
+ * processos (`status: "waiting"` aparece nos pedidos de permissão, perguntas e diálogos,
+ * a partir do 2.1.319). Sem ele, só dá para ver pelo transcript as perguntas
+ * (AskUserQuestion) e o fim do turno; um pedido de permissão parece uma ferramenta lenta.
+ */
+export function awaitingFor(
+  main: AgentTracker,
+  reg: Pick<RegistryEntry, 'status' | 'waitingFor' | 'statusUpdatedAt'> | null,
+  subagents: SubagentState[]
+): Awaiting | null {
+  const status = reg?.status ?? null
+  const tool = main.currentTool
+  // O transcript não muda enquanto espera, então a última linha identifica o email.
+  const since = main.lastActivity || (reg?.statusUpdatedAt ?? 0)
+  if (status === 'waiting') {
+    if (tool && QUESTION_TOOLS.has(tool.name)) return { reason: 'pergunta', since, detail: null }
+    if (reg?.waitingFor === 'permission prompt' || (reg?.waitingFor === null && tool)) {
+      const fromSub = tool && DELEGATION_TOOLS.has(tool.name) ? subagents.find((a) => a.currentTool)?.currentTool : null
+      return { reason: 'permissao', since, detail: (fromSub ?? tool)?.name ?? null }
+    }
+    return { reason: 'pergunta', since, detail: reg?.waitingFor ?? null }
+  }
+  if (status !== null && status !== 'idle') return null
+  if (status === null && tool && QUESTION_TOOLS.has(tool.name)) return { reason: 'pergunta', since, detail: null }
+  if (main.turnFinished && subagents.length === 0 && since > 0) return { reason: 'relatorio', since, detail: null }
+  return null
 }
 
 interface SessionRecord {
@@ -164,7 +203,9 @@ export class OfficeStore {
         cwd: s(r.cwd),
         name: s(r.name),
         nameSource: s(r.nameSource),
-        status: s(r.status)
+        status: s(r.status),
+        waitingFor: s(r.waitingFor),
+        statusUpdatedAt: typeof r.statusUpdatedAt === 'number' ? r.statusUpdatedAt : null
       })
       this.registrySeen = true
     } catch {
@@ -229,6 +270,7 @@ export class OfficeStore {
       mcpCalls: main.mcpCalls,
       mcpResults: main.mcpResultsSince(now - this.opts.mcpResultMs),
       running,
+      awaiting: awaitingFor(main, reg, subagents),
       subagents
     }
   }

@@ -36,8 +36,8 @@ const POSES: Record<Pose, { frames: number[]; rate: number }> = {
   andando: { frames: [8, 9], rate: 6 }
 }
 
-export type Screen = 'desligado' | 'codigo' | 'terminal' | 'navegador' | 'erro'
-export const SCREEN: Record<Screen, number> = { desligado: 0, codigo: 1, terminal: 2, navegador: 3, erro: 4 }
+export type Screen = 'desligado' | 'codigo' | 'terminal' | 'navegador' | 'erro' | 'email'
+export const SCREEN: Record<Screen, number> = { desligado: 0, codigo: 1, terminal: 2, navegador: 3, erro: 4, email: 5 }
 
 export const ITEM = { papel: 0, amassado: 1, fumaca: 2, postit: 3, cafe: 4, suor: 5, z: 6, planta: 7, cadeira: 8, envelope: 9, interrogacao: 10 } as const
 

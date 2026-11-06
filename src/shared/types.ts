@@ -30,6 +30,22 @@ export interface McpResult {
   at: number
 }
 
+/**
+ * Por que a sessão está esperando o CEO (vira um email não lido no computador dele):
+ * - `permissao`: pediu permissão para usar uma ferramenta;
+ * - `pergunta`: fez uma pergunta ou abriu um diálogo que só a pessoa responde;
+ * - `relatorio`: terminou o turno e espera o próximo pedido.
+ */
+export type AwaitingReason = 'permissao' | 'pergunta' | 'relatorio'
+
+export interface Awaiting {
+  reason: AwaitingReason
+  /** Desde quando espera. Junto com o id da sessão, identifica o email. */
+  since: number
+  /** Ferramenta envolvida (permissão) ou o que o Claude Code diz que espera. */
+  detail: string | null
+}
+
 export interface SubagentState {
   id: string
   /** Tipo do agente, lido do agent-<id>.meta.json quando existe. */
@@ -80,6 +96,8 @@ export interface SessionState {
   mcpResults: McpResult[]
   /** true quando o registro em ~/.claude/sessions indica um processo vivo. */
   running: boolean
+  /** Esperando uma resposta do CEO, ou null se não precisa dele agora. */
+  awaiting: Awaiting | null
   subagents: SubagentState[]
 }
 
