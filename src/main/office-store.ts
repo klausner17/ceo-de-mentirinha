@@ -15,6 +15,8 @@ export interface StoreOptions {
   goneWithRegistryMs: number
   /** Subagente sem escrita há este tempo some, mesmo sem ter terminado. */
   subagentGoneMs: number
+  /** Por quanto tempo um resultado MCP continua visível (office boy voltando). */
+  mcpResultMs: number
   /** Verifica se um pid está vivo. Injetável para os testes. */
   isAlive: (pid: number) => boolean
 }
@@ -24,6 +26,7 @@ export const defaultOptions: StoreOptions = {
   goneMs: 30 * 60_000,
   goneWithRegistryMs: 2 * 60_000,
   subagentGoneMs: 10 * 60_000,
+  mcpResultMs: 30_000,
   isAlive: (pid) => {
     try {
       process.kill(pid, 0)
@@ -192,6 +195,8 @@ export class OfficeStore {
       lastActivity: main.lastActivity,
       lastErrorAt: main.lastErrorAt,
       status: busy ? 'trabalhando' : 'ocioso',
+      mcpCalls: main.mcpCalls,
+      mcpResults: main.mcpResultsSince(now - this.opts.mcpResultMs),
       running,
       subagents
     }

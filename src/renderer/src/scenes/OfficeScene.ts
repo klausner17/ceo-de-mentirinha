@@ -5,6 +5,7 @@ import Phaser from 'phaser'
 import type { SessionState } from '@shared/types'
 import { createAnimations, personKey, preload, SCALE, TILE, TILES } from '../art'
 import { Desk, DESK_H, DESK_W, FONT } from './Desk'
+import { OfficeBoys } from './OfficeBoys'
 
 const GAP = 16
 const WING_PAD = 16
@@ -18,6 +19,7 @@ export class OfficeScene extends Phaser.Scene {
   private empty?: Phaser.GameObjects.Text
   private hallHeight = 0
   private door = { x: 0, y: 0 }
+  private boys?: OfficeBoys
   private ready = false
 
   constructor() {
@@ -51,6 +53,14 @@ export class OfficeScene extends Phaser.Scene {
       return { x: (p?.x ?? 0) * SCALE, y: (p?.y ?? 0) * SCALE }
     }
     this.door = { ...at('porta'), y: at('porta').y + TILE }
+    // Portaria com o malote: os office boys de MCP fazem fila na frente dela.
+    const portaria = at('portaria')
+    this.add.image(portaria.x, portaria.y, 'portaria').setScale(SCALE).setOrigin(0.5, 1).setDepth(1)
+    this.add
+      .text(portaria.x, portaria.y - 46, 'Portaria', { fontFamily: FONT, fontSize: '10px', color: '#1d1f27', backgroundColor: '#e8b923', padding: { x: 3, y: 1 } })
+      .setOrigin(0.5, 1)
+      .setDepth(1)
+    this.boys = new OfficeBoys(this, { x: portaria.x - 20, y: portaria.y })
     const plate = at('placa-sala-do-ceo')
     this.add.text(plate.x, plate.y, 'Sala do CEO', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#e8c35b' }).setDepth(1)
     // O CEO (você) na própria mesa.
@@ -183,5 +193,6 @@ export class OfficeScene extends Phaser.Scene {
       rowH = Math.max(rowH, wingH)
     }
     this.cameras.main.setBounds(0, 0, Math.max(right, this.hallHeight * 4 + GAP), y + rowH + GAP)
+    this.boys?.sync([...this.sessions.values()], (id) => this.desks.get(id)?.anchor() ?? null)
   }
 }

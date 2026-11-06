@@ -102,6 +102,11 @@ export class Desk {
     scene.tweens.add({ targets: this.postits, y: 92, duration: 500, yoyo: true, repeat: -1 })
   }
 
+  /** Ponto (no mundo) em frente à mesa, de onde saem e para onde voltam os office boys. */
+  anchor(): { x: number; y: number } {
+    return { x: this.root.x + DESK_W - 20, y: this.root.y + 118 }
+  }
+
   moveTo(x: number, y: number): void {
     if (this.root.x === x && this.root.y === y) return
     this.scene.tweens.add({ targets: this.root, x, y, duration: 250, ease: 'Sine.easeOut' })

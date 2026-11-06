@@ -10,7 +10,7 @@
  "tileheight": 16,
  "infinite": false,
  "nextlayerid": 4,
- "nextobjectid": 5,
+ "nextobjectid": 6,
  "layers": [
   {
    "id": 1,
@@ -528,6 +528,18 @@
    "x": 0,
    "y": 0,
    "objects": [
+    {
+     "id": 5,
+     "name": "portaria",
+     "type": "ponto",
+     "point": true,
+     "x": 120,
+     "y": 56,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true
+    },
     {
      "id": 1,
      "name": "porta",

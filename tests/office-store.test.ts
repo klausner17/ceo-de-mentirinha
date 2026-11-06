@@ -3,7 +3,7 @@ import type { OfficeDelta } from '../src/shared/types'
 import { OfficeStore } from '../src/main/office-store'
 import { fixture, lines, SESSION, T0 } from './helpers'
 
-const opts = { idleMs: 5 * 60_000, goneMs: 30 * 60_000, goneWithRegistryMs: 2 * 60_000, subagentGoneMs: 10 * 60_000 }
+const opts = { idleMs: 5 * 60_000, goneMs: 30 * 60_000, goneWithRegistryMs: 2 * 60_000, subagentGoneMs: 10 * 60_000, mcpResultMs: 30_000 }
 const newStore = (alive: number[] = []) => new OfficeStore({ ...opts, isAlive: (pid) => alive.includes(pid) })
 
 describe('OfficeStore', () => {
@@ -105,5 +105,17 @@ describe('OfficeStore', () => {
     const store = newStore()
     store.ingestSession(SESSION, lines('session-2.1.318-tool-pending.jsonl'))
     expect(store.snapshot(T0 + 10_000)[0]!.contextLimit).toBe(200_000)
+  })
+  it('separa as chamadas MCP pendentes e as que acabaram há pouco', () => {
+    const store = newStore()
+    store.ingestSession(SESSION, lines('session-2.1.318-mcp.jsonl'))
+    const [s] = store.snapshot(T0 + 70_000)
+    expect(s!.mcpCalls).toEqual([{ id: 'toolu_m2', server: 'jira', tool: 'get_issue', startedAt: T0 + 61_000 }])
+    expect(s!.mcpResults).toEqual([
+      { id: 'toolu_m1', server: 'jira', ok: true, at: T0 + 65_000 },
+      { id: 'toolu_m3', server: 'claude_ai_Google_Drive', ok: false, at: T0 + 66_000 }
+    ])
+    // Depois de 30 segundos o resultado some (o office boy já voltou).
+    expect(store.snapshot(T0 + 100_000)[0]!.mcpResults).toEqual([])
   })
 })
