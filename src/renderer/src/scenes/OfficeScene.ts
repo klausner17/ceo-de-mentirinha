@@ -4,7 +4,8 @@
 
 import Phaser from 'phaser'
 import type { SessionState } from '@shared/types'
-import { createAnimations, personKey, preload, SCALE, TILE, TILES } from '../art'
+import { createAnimations, mapa, personKey, preload, SCALE, TILE, TILES } from '../art'
+import { buildNav, type HallMap, type Rect } from '../nav'
 import { planHouse, type HouseFrame, type Room, WALL_TILES } from '../house'
 import { Desk, DESK_H, DESK_W, FONT } from './Desk'
 import { OfficeBoys } from './OfficeBoys'
@@ -15,6 +16,11 @@ const WALL = TILE * WALL_TILES
 const DESKS_PER_ROW = 2
 const DESK_SIZE = { w: DESK_W, h: DESK_H, gap: GAP, pad: WING_PAD, perRow: DESKS_PER_ROW }
 
+/** A mesa, a cadeira e o funcionário sentado bloqueiam a passagem; a plaquinha com o nome não. */
+function deskObstacle(at: { x: number; y: number }): Rect {
+  return { x: at.x + DESK_W / 2 - 52, y: at.y + 46, w: 104, h: 74 }
+}
+
 export class OfficeScene extends Phaser.Scene {
   private readonly sessions = new Map<string, SessionState>()
   private readonly desks = new Map<string, Desk>()
@@ -22,6 +28,8 @@ export class OfficeScene extends Phaser.Scene {
   private empty?: Phaser.GameObjects.Text
   private frame: HouseFrame = { tile: TILE, width: 0, hallHeight: 0, corridor: { x: 0, w: 0 }, frontDoor: { x: 0, y: 0 } }
   private boys?: OfficeBoys
+  /** Móveis do hall que não estão no tileset (portaria, mesa do CEO). */
+  private hallObstacles: Rect[] = []
   private ready = false
 
   constructor() {
@@ -68,11 +76,13 @@ export class OfficeScene extends Phaser.Scene {
       .text(portaria.x, portaria.y - 46, 'Portaria', { fontFamily: FONT, fontSize: '10px', color: '#1d1f27', backgroundColor: '#e8b923', padding: { x: 3, y: 1 } })
       .setOrigin(0.5, 1)
       .setDepth(1)
-    this.boys = new OfficeBoys(this, { x: portaria.x - 20, y: portaria.y })
+    this.boys = new OfficeBoys(this, { x: portaria.x - 20, y: portaria.y + 16 })
+    this.hallObstacles.push({ x: portaria.x - 32, y: portaria.y - 40, w: 64, h: 40 })
     const plate = at('placa-sala-do-ceo')
     this.add.text(plate.x + 8, plate.y, 'Sala do CEO', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#e8c35b' }).setDepth(1)
     // O CEO (você) na própria mesa.
     const ceo = at('sala-do-ceo')
+    this.hallObstacles.push({ x: ceo.x - 48, y: ceo.y - 30, w: 96, h: 66 })
     this.add.sprite(ceo.x, ceo.y + 4, personKey('diretor'), 0).setScale(SCALE).setOrigin(0.5, 1).setDepth(1)
     this.add.image(ceo.x, ceo.y - 4, 'mesa').setScale(SCALE).setOrigin(0.5, 0).setDepth(1)
     this.add
@@ -194,6 +204,18 @@ export class OfficeScene extends Phaser.Scene {
     )
     const { width } = this.frame
 
+    // Grade de caminhada: paredes do hall e dos cômodos, portas, corredor e móveis.
+    const nav = buildNav({
+      map: mapa as HallMap,
+      tiles: TILES,
+      tile: TILE,
+      width,
+      hallHeight: this.frame.hallHeight,
+      plan,
+      obstacles: [...this.hallObstacles, ...plan.rooms.flatMap((r) => r.desks.map(deskObstacle))]
+    })
+    this.boys?.setNav(nav)
+
     // Corredor central, parede de baixo e o contorno da casa.
     if (plan.corridor.h > 0) this.strip(plan.corridor.x, plan.corridor.y, plan.corridor.w, plan.corridor.h, TILES.piso, 0)
     this.strip(0, plan.bottom, width, TILE, TILES.paredeTopo)
@@ -210,6 +232,7 @@ export class OfficeScene extends Phaser.Scene {
           this.desks.set(s.id, desk)
         }
         desk.setRoute(room.route)
+        desk.setNav(nav)
         desk.moveTo(at.x, at.y)
         desk.update(s)
       })

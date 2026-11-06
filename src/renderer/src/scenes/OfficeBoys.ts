@@ -6,7 +6,9 @@ import Phaser from 'phaser'
 import { mcpLabel } from '@shared/mcp'
 import type { SessionState } from '@shared/types'
 import { ITEM, SCALE } from '../art'
+import type { NavGrid } from '../nav'
 import { FONT } from './Desk'
+import { pathTo, walkPath } from './walker'
 
 const SPEED = 260
 const QUEUE_STEP = 24
@@ -31,11 +33,17 @@ interface Boy {
 export class OfficeBoys {
   private readonly boys = new Map<string, Boy>()
   private readonly signs = new Map<string, Phaser.GameObjects.Text>()
+  private nav: NavGrid | null = null
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly portaria: Point
   ) {}
+
+  /** Grade de caminhada atual: os office boys desviam de paredes e móveis por ela. */
+  setNav(nav: NavGrid): void {
+    this.nav = nav
+  }
 
   /** Reconcilia os office boys com as chamadas MCP de todas as sessões. */
   sync(sessions: SessionState[], anchor: (sessionId: string) => Point | null): void {
@@ -119,7 +127,8 @@ export class OfficeBoys {
     if (ok === false) {
       // Falhou: volta de mãos vazias, perdido, e some no meio do caminho.
       boy.carry.setFrame(ITEM.interrogacao).setVisible(true)
-      const lost = { x: (boy.body.x + boy.home.x) / 2 + Phaser.Math.Between(-60, 60), y: (boy.body.y + boy.home.y) / 2 }
+      const guess = { x: (boy.body.x + boy.home.x) / 2 + Phaser.Math.Between(-60, 60), y: (boy.body.y + boy.home.y) / 2 }
+      const lost = this.nav?.nearestFree(guess) ?? guess
       this.walk(boy, lost, () => this.vanish(boy))
       return
     }
@@ -129,15 +138,13 @@ export class OfficeBoys {
 
   private walk(boy: Boy, to: Point, done: () => void): void {
     boy.target = to
-    const distance = Phaser.Math.Distance.Between(boy.body.x, boy.body.y, to.x, to.y)
-    this.scene.tweens.killTweensOf(boy.body)
-    boy.sprite.play('officeboy-andando', true).setFlipX(to.x < boy.body.x)
-    this.scene.tweens.add({
-      targets: boy.body,
-      x: to.x,
-      y: to.y,
-      duration: Math.max(150, (distance / SPEED) * 1000),
-      onComplete: () => {
+    boy.sprite.play('officeboy-andando', true)
+    walkPath(pathTo(this.nav, { x: boy.body.x, y: boy.body.y }, to), {
+      scene: this.scene,
+      movers: [{ obj: boy.body }],
+      speed: SPEED,
+      onLeg: (left) => boy.sprite.setFlipX(left),
+      done: () => {
         boy.sprite.stop().setFrame(8).setFlipX(false)
         done()
       }

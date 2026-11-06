@@ -5,7 +5,9 @@ import type { SessionState, SubagentState } from '@shared/types'
 import { seniorityFor } from '@shared/seniority'
 import { animKey, ITEM, personKey, SCALE, SCREEN, type Pose, type Screen } from '../art'
 import type { Point } from '../house'
+import type { NavGrid } from '../nav'
 import { describeTool } from '../tools'
+import { walkPath, pathTo } from './walker'
 
 export const DESK_W = 224
 export const DESK_H = 176
@@ -63,6 +65,7 @@ export class Desk {
   private lastErrorAt: number | null = null
   private errorUntil = 0
   private screen: Screen = 'desligado'
+  private nav: NavGrid | null = null
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -106,6 +109,11 @@ export class Desk {
 
   setRoute(route: Point[]): void {
     this.route = route
+  }
+
+  /** Grade de caminhada atual: os liderados desviam de paredes e móveis por ela. */
+  setNav(nav: NavGrid): void {
+    this.nav = nav
   }
 
   /** Ponto (no mundo) em frente à mesa, de onde saem e para onde voltam os office boys. */
@@ -253,9 +261,9 @@ export class Desk {
           .setDepth(21)
         sub = { sprite, label, seniority, arrived: false, slot }
         this.team.set(a.id, sub)
-        this.walkPath(sub, [...this.route.slice(1), this.slot(slot)], () => {
+        this.walk(sub, this.slot(slot), () => {
           sub!.arrived = true
-        })
+        }, this.route.slice(1))
       }
       if (sub.arrived) {
         // Trabalhando: anima no lugar; sem ferramenta: parado.
@@ -265,38 +273,28 @@ export class Desk {
     }
   }
 
-  private walk(sub: Subordinate, to: { x: number; y: number }, done?: () => void): void {
-    const distance = Phaser.Math.Distance.Between(sub.sprite.x, sub.sprite.y, to.x, to.y)
-    const duration = Math.max(200, (distance / WALK_SPEED) * 1000)
+  /**
+   * Anda até `to` pela grade de caminhada, desviando de paredes e móveis. Sem grade,
+   * passa pelos pontos de reserva (a rota pelas portas) e segue em linha reta.
+   */
+  private walk(sub: Subordinate, to: Point, done?: () => void, fallback: Point[] = []): void {
     sub.sprite.play(animKey(sub.seniority, 'andando'), true)
-    sub.sprite.setFlipX(to.x < sub.sprite.x)
-    this.scene.tweens.killTweensOf([sub.sprite, sub.label])
-    this.scene.tweens.add({
-      targets: sub.sprite,
-      x: to.x,
-      y: to.y,
-      duration,
-      onComplete: () => {
+    walkPath(pathTo(this.nav, { x: sub.sprite.x, y: sub.sprite.y }, to, fallback), {
+      scene: this.scene,
+      movers: [{ obj: sub.sprite }, { obj: sub.label, dy: 1 }],
+      speed: WALK_SPEED,
+      onLeg: (left) => sub.sprite.setFlipX(left),
+      done: () => {
         sub.sprite.stop().setFrame(8).setFlipX(false)
         done?.()
       }
     })
-    this.scene.tweens.add({ targets: sub.label, x: to.x, y: to.y + 1, duration })
-  }
-
-  /** Anda ponto a ponto, para passar pelas portas em vez de atravessar paredes. */
-  private walkPath(sub: Subordinate, points: Point[], done?: () => void): void {
-    const [next, ...rest] = points
-    if (!next) {
-      done?.()
-      return
-    }
-    this.walk(sub, next, rest.length ? () => this.walkPath(sub, rest, done) : done)
   }
 
   private leaveThroughDoor(sub: Subordinate): void {
     sub.arrived = false
-    this.walkPath(sub, [...this.route].reverse(), () => {
+    const exit = this.route[0] ?? { x: sub.sprite.x, y: sub.sprite.y }
+    this.walk(sub, exit, () => {
       this.scene.tweens.add({
         targets: [sub.sprite, sub.label],
         alpha: 0,
@@ -306,7 +304,7 @@ export class Desk {
           sub.label.destroy()
         }
       })
-    })
+    }, [...this.route].reverse().slice(1, -1))
   }
 
   leave(): void {

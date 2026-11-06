@@ -4,6 +4,9 @@
 import Phaser from 'phaser'
 import type { Seniority } from '@shared/types'
 import mapa from '../../../assets/mapa/escritorio.json'
+
+/** O mapa do hall, também usado para montar a grade de caminhada. */
+export { mapa }
 import desconhecidoUrl from '../../../assets/sprites/funcionario-desconhecido.png?url'
 import diretorUrl from '../../../assets/sprites/funcionario-diretor.png?url'
 import juniorUrl from '../../../assets/sprites/funcionario-junior.png?url'
