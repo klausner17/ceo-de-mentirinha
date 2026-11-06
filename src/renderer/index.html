@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+    />
+    <title>CEO de Mentirinha</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1d1f27; color: #e8e6e3; font-family: -apple-system, system-ui, sans-serif; overflow: hidden; }
+      #app { display: grid; grid-template-rows: 1fr auto; height: 100%; }
+      #game { min-height: 0; }
+      #log { max-height: 120px; overflow-y: auto; font: 12px ui-monospace, Menlo, monospace; padding: 6px 10px; background: #15161c; border-top: 1px solid #2c2f3a; }
+      #log .warn { color: #f2c66d; }
+      #log .error { color: #ff7b72; }
+      #log time { color: #7d8590; margin-right: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="game"></div>
+      <div id="log" aria-label="Log do escritório"></div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

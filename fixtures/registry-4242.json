@@ -1,0 +1,10 @@
+{
+  "pid": 4242,
+  "sessionId": "11111111-2222-4333-8444-555555555555",
+  "cwd": "/Users/ceo/code/loja",
+  "startedAt": 1793973501029,
+  "version": "2.1.318",
+  "kind": "interactive",
+  "name": "loja-1",
+  "status": "busy"
+}

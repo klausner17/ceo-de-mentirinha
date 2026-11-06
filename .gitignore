@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.DS_Store
+# Nunca versionar transcripts reais do Claude Code (ver docs/fase-0-formato-dos-transcripts.md)
+*.real.jsonl
