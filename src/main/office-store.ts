@@ -43,7 +43,29 @@ interface RegistryEntry {
   sessionId: string | null
   cwd: string | null
   name: string | null
+  /** Origem do nome: `user`, `peer`, `hook`, `auto`, `derived` (pasta + número), `collision`. */
+  nameSource: string | null
   status: string | null
+}
+
+/** Nomes do registro de processos que alguém escolheu de propósito. */
+const CHOSEN_NAMES = new Set(['user', 'peer', 'hook'])
+/** Tamanho máximo do primeiro pedido quando ele vira o nome da mesa. */
+const PROMPT_NAME_MAX = 48
+
+/**
+ * O nome da sessão como a pessoa a reconhece: o nome que ela deu (/rename ou registro),
+ * depois o título gerado pelo Claude Code, depois o primeiro pedido e, por último, o nome
+ * derivado da pasta (ex.: "loja-1"), que diz pouco.
+ */
+export function sessionName(main: AgentTracker, reg: Pick<RegistryEntry, 'name' | 'nameSource'> | null): string | null {
+  const t = main.titles
+  const regName = reg?.name ?? null
+  const chosen = regName && reg?.nameSource && CHOSEN_NAMES.has(reg.nameSource) ? regName : null
+  const auto = regName && reg?.nameSource === 'auto' ? regName : null
+  const prompt = main.firstPrompt
+  const fromPrompt = prompt && (prompt.length > PROMPT_NAME_MAX ? `${prompt.slice(0, PROMPT_NAME_MAX - 1).trimEnd()}…` : prompt)
+  return t.custom ?? chosen ?? t.agent ?? t.ai ?? t.summary ?? auto ?? fromPrompt ?? regName ?? null
 }
 
 interface SessionRecord {
@@ -136,7 +158,14 @@ export class OfficeStore {
     try {
       const r = JSON.parse(json) as Record<string, unknown>
       const s = (v: unknown) => (typeof v === 'string' ? v : null)
-      this.registry.set(pid, { pid, sessionId: s(r.sessionId), cwd: s(r.cwd), name: s(r.name), status: s(r.status) })
+      this.registry.set(pid, {
+        pid,
+        sessionId: s(r.sessionId),
+        cwd: s(r.cwd),
+        name: s(r.name),
+        nameSource: s(r.nameSource),
+        status: s(r.status)
+      })
       this.registrySeen = true
     } catch {
       // Arquivo sendo escrito: ignora até a próxima mudança.
@@ -186,7 +215,9 @@ export class OfficeStore {
       branch: main.branch,
       model: main.model,
       seniority: seniorityFor(main.model),
-      title: main.title ?? reg?.name ?? null,
+      title: sessionName(main, reg),
+      lastPrompt: main.lastPrompt,
+      startedAt: main.startedAt || null,
       contextTokens: main.contextTokens,
       contextLimit: main.contextTokens > 200_000 ? 1_000_000 : 200_000,
       outputTokens: main.outputTokens,

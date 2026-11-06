@@ -6,6 +6,7 @@ import { seniorityFor } from '@shared/seniority'
 import { animKey, ITEM, personKey, SCALE, SCREEN, type Pose, type Screen } from '../art'
 import type { Point } from '../house'
 import type { NavGrid } from '../nav'
+import { deskLine, sessionTitle } from '../describe'
 import { describeTool } from '../tools'
 import { walkPath, pathTo } from './walker'
 
@@ -32,11 +33,6 @@ function fit(text: Phaser.GameObjects.Text, value: string, maxWidth: number): vo
   }
 }
 
-function shortModel(model: string | null): string {
-  if (!model) return 'modelo ?'
-  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
-}
-
 interface Subordinate {
   sprite: Phaser.GameObjects.Sprite
   label: Phaser.GameObjects.Text
@@ -52,6 +48,7 @@ export class Desk {
   private readonly balloon: Phaser.GameObjects.Text
   private readonly title: Phaser.GameObjects.Text
   private readonly subtitle: Phaser.GameObjects.Text
+  private readonly plate: Phaser.GameObjects.Rectangle
   private readonly zzz: Phaser.GameObjects.Sprite
   private readonly sweat: Phaser.GameObjects.Sprite
   private readonly coffee: Phaser.GameObjects.Sprite
@@ -66,13 +63,17 @@ export class Desk {
   private errorUntil = 0
   private screen: Screen = 'desligado'
   private nav: NavGrid | null = null
+  private hover = false
+  private selected = false
 
   constructor(
     private readonly scene: Phaser.Scene,
     x: number,
     y: number,
     /** Caminho da porta da rua até dentro do cômodo: hall, corredor e porta da ala. */
-    private route: Point[]
+    private route: Point[],
+    /** Clique na mesa (sem arrastar a câmera): abre o painel de detalhes. */
+    onClick: () => void
   ) {
     const s = <T extends Phaser.GameObjects.Sprite | Phaser.GameObjects.Image>(o: T): T => o.setScale(SCALE) as T
     const cx = DESK_W / 2
@@ -92,13 +93,21 @@ export class Desk {
       .text(cx, 14, '', { fontFamily: FONT, fontSize: '12px', color: '#1d1f27', backgroundColor: '#f2c66d', padding: { x: 6, y: 3 } })
       .setOrigin(0.5)
       .setVisible(false)
-    const plate = scene.add.rectangle(6, 124, DESK_W - 12, 44, 0x1d1f27, 0.72).setOrigin(0)
+    const plate = (this.plate = scene.add.rectangle(6, 124, DESK_W - 12, 44, 0x1d1f27, 0.72).setOrigin(0))
     this.title = scene.add.text(14, 128, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#e8e6e3' })
     this.subtitle = scene.add.text(14, 147, '', { fontFamily: FONT, fontSize: '11px', color: '#9aa1b2' })
 
     this.root = scene.add.container(x, y, [
       chair, this.person, desk, this.monitor, this.papers, this.postits, this.coffee, this.zzz, this.sweat, plate, this.title, this.subtitle, this.balloon
     ])
+    // Área clicável: a mesa inteira. Um arrasto (para mover a câmera) não conta como clique.
+    const hit = scene.add.zone(0, 0, DESK_W, DESK_H).setOrigin(0).setInteractive({ useHandCursor: true })
+    hit.on('pointerover', () => this.setHover(true))
+    hit.on('pointerout', () => this.setHover(false))
+    hit.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.getDistance() < 6) onClick()
+    })
+    this.root.addAt(hit, 0)
     this.root.setDepth(10).setAlpha(0)
     scene.tweens.add({ targets: this.root, alpha: 1, duration: 400 })
 
@@ -150,12 +159,30 @@ export class Desk {
     this.sweat.setVisible(tired && !idle)
     this.coffee.setVisible(tired)
 
-    fit(this.title, s.title ?? s.id.slice(0, 8), DESK_W - 28)
-    fit(this.subtitle, `${s.branch ?? 'sem branch'} · ${shortModel(s.model)} · ${Math.round(s.contextTokens / 1000)}k`, DESK_W - 28)
+    fit(this.title, sessionTitle(s), DESK_W - 28)
+    fit(this.subtitle, deskLine(s, Date.now()), DESK_W - 28)
 
     this.updatePapers(s.contextTokens, s.contextLimit)
     this.maybeCrumple(s.lastErrorAt)
     this.updateTeam(s.subagents)
+  }
+
+  /** Mesa aberta no painel de detalhes: plaquinha com borda dourada. */
+  setSelected(selected: boolean): void {
+    this.selected = selected
+    this.paintPlate()
+  }
+
+  private setHover(hover: boolean): void {
+    this.hover = hover
+    this.paintPlate()
+  }
+
+  private paintPlate(): void {
+    this.plate.setFillStyle(0x1d1f27, this.hover || this.selected ? 0.9 : 0.72)
+    if (this.selected) this.plate.setStrokeStyle(2, 0xe8c35b)
+    else if (this.hover) this.plate.setStrokeStyle(1, 0x9aa1b2)
+    else this.plate.setStrokeStyle()
   }
 
   private setPose(pose: Pose): void {

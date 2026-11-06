@@ -52,8 +52,15 @@ export interface SessionState {
   branch: string | null
   model: string | null
   seniority: Seniority
-  /** Título gerado pelo Claude Code (linha ai-title) ou nome do registro de processos. */
+  /**
+   * Nome da sessão como aparece no Claude Code: o que a pessoa deu (/rename), o título
+   * gerado, o primeiro pedido ou, por último, o nome derivado da pasta.
+   */
   title: string | null
+  /** Último pedido digitado pela pessoa nesta sessão. */
+  lastPrompt: string | null
+  /** Quando a sessão começou (primeira linha do transcript). */
+  startedAt: number | null
   /** Tamanho do contexto no último turno: input + cache lido + cache criado. */
   contextTokens: number
   /** Limite de contexto estimado para a pilha de papel (200 mil, ou 1 milhão se já passou disso). */

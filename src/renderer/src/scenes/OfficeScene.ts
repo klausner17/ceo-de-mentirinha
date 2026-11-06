@@ -7,6 +7,7 @@ import type { SessionState } from '@shared/types'
 import { createAnimations, mapa, personKey, preload, SCALE, TILE, TILES } from '../art'
 import { buildNav, type HallMap, type Rect } from '../nav'
 import { planHouse, type HouseFrame, type Room, WALL_TILES } from '../house'
+import { roomKey, roomPeople } from '../describe'
 import { Desk, DESK_H, DESK_W, FONT } from './Desk'
 import { OfficeBoys } from './OfficeBoys'
 
@@ -15,6 +16,9 @@ const WING_PAD = 16
 const WALL = TILE * WALL_TILES
 const DESKS_PER_ROW = 2
 const DESK_SIZE = { w: DESK_W, h: DESK_H, gap: GAP, pad: WING_PAD, perRow: DESKS_PER_ROW }
+
+/** O que foi clicado: uma mesa (sessão) ou a placa de um cômodo (projeto). */
+export type Selection = { kind: 'session'; id: string } | { kind: 'room'; key: string }
 
 /** A mesa, a cadeira e o funcionário sentado bloqueiam a passagem; a plaquinha com o nome não. */
 function deskObstacle(at: { x: number; y: number }): Rect {
@@ -31,6 +35,9 @@ export class OfficeScene extends Phaser.Scene {
   /** Móveis do hall que não estão no tileset (portaria, mesa do CEO). */
   private hallObstacles: Rect[] = []
   private ready = false
+  private selection: Selection | null = null
+  /** Avisado quando a pessoa clica numa mesa ou na placa de um cômodo. */
+  onSelect: (sel: Selection) => void = () => {}
 
   constructor() {
     super('office')
@@ -46,7 +53,22 @@ export class OfficeScene extends Phaser.Scene {
     this.setupCamera()
     this.ready = true
     this.scale.on('resize', () => this.layout())
+    // "Esperando você há 3 min" envelhece sem chegar linha nova: atualiza as plaquinhas.
+    this.time.addEvent({ delay: 30_000, loop: true, callback: () => this.refreshDesks() })
     this.layout()
+  }
+
+  private refreshDesks(): void {
+    for (const [id, desk] of this.desks) {
+      const s = this.sessions.get(id)
+      if (s) desk.update(s)
+    }
+  }
+
+  /** Marca a mesa aberta no painel (ou nenhuma). */
+  select(sel: Selection | null): void {
+    this.selection = sel
+    for (const [id, desk] of this.desks) desk.setSelected(sel?.kind === 'session' && sel.id === id)
   }
 
   /** O hall vem do mapa do Tiled: parede, porta, estante, fichário, café e sala do CEO. */
@@ -128,7 +150,7 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   /** Um cômodo: chão, parede de cima com o nome, paredes laterais e a porta para o corredor. */
-  private drawRoom(room: Room, count: number): void {
+  private drawRoom(room: Room, list: SessionState[]): void {
     const { x, y, w, h, floorY, side } = room
     this.strip(x, floorY, w, h - WALL, room.key ? TILES.carpete : TILES.carpeteB)
     this.strip(x, y, w, TILE, TILES.paredeTopo)
@@ -159,8 +181,12 @@ export class OfficeScene extends Phaser.Scene {
       .setDepth(3)
     this.wings.push(title)
     if (room.key) {
+      const key = room.key
+      title.setInteractive({ useHandCursor: true }).on('pointerup', (p: Phaser.Input.Pointer) => {
+        if (p.getDistance() < 6) this.onSelect({ kind: 'room', key })
+      })
       const people = this.add
-        .text(x + w - TILE - 4, y + TILE + 8, `${count} funcionário(s)`, { fontFamily: FONT, fontSize: '12px', color: '#e8e6e3' })
+        .text(x + w - TILE - 4, y + TILE + 8, roomPeople(list), { fontFamily: FONT, fontSize: '12px', color: '#e8e6e3' })
         .setOrigin(1, 0)
         .setDepth(3)
       this.wings.push(people)
@@ -189,7 +215,7 @@ export class OfficeScene extends Phaser.Scene {
 
     const byProject = new Map<string, SessionState[]>()
     for (const s of this.sessions.values()) {
-      const key = s.cwd ?? s.project
+      const key = roomKey(s)
       const list = byProject.get(key) ?? []
       list.push(s)
       byProject.set(key, list)
@@ -223,12 +249,14 @@ export class OfficeScene extends Phaser.Scene {
 
     for (const room of plan.rooms) {
       const list = room.key ? byProject.get(room.key)! : []
-      this.drawRoom(room, list.length)
+      this.drawRoom(room, list)
       list.forEach((s, i) => {
         const at = room.desks[i]!
         let desk = this.desks.get(s.id)
         if (!desk) {
-          desk = new Desk(this, at.x, at.y, room.route)
+          const id = s.id
+          desk = new Desk(this, at.x, at.y, room.route, () => this.onSelect({ kind: 'session', id }))
+          desk.setSelected(this.selection?.kind === 'session' && this.selection.id === id)
           this.desks.set(s.id, desk)
         }
         desk.setRoute(room.route)
