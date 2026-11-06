@@ -15,11 +15,29 @@
       #log .warn { color: #f2c66d; }
       #log .error { color: #ff7b72; }
       #log time { color: #7d8590; margin-right: 6px; }
+      #game { position: relative; }
+      #details { position: absolute; top: 12px; right: 12px; width: 320px; max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+        background: #15161cf2; border: 1px solid #e8c35b; border-radius: 8px; padding: 14px 16px; box-shadow: 0 8px 24px #0008; font-size: 13px; z-index: 5; }
+      #details[hidden] { display: none; }
+      #details h2 { margin: 0 24px 2px 0; font-size: 16px; line-height: 1.3; color: #e8c35b; overflow-wrap: anywhere; }
+      #details .sub { margin: 0 0 12px; color: #9aa1b2; }
+      #details dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+      #details dt { color: #9aa1b2; white-space: nowrap; }
+      #details dd { margin: 0; overflow-wrap: anywhere; }
+      #details dd.mono { font: 11px ui-monospace, Menlo, monospace; color: #c9ccd4; user-select: text; }
+      #details ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+      #details li button { width: 100%; text-align: left; background: #1d1f27; color: inherit; border: 1px solid #2c2f3a; border-radius: 6px; padding: 8px 10px; font: inherit; cursor: pointer; }
+      #details li button:hover { border-color: #e8c35b; }
+      #details li small { display: block; color: #9aa1b2; margin-top: 2px; }
+      #details .close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: #9aa1b2; font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 8px; }
+      #details .close:hover { color: #e8e6e3; }
     </style>
   </head>
   <body>
     <div id="app">
-      <div id="game"></div>
+      <div id="game">
+        <aside id="details" aria-live="polite" hidden></aside>
+      </div>
       <div id="log" aria-label="Log do escritório"></div>
     </div>
     <script type="module" src="./src/main.ts"></script>

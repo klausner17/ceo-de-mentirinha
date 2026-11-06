@@ -4,13 +4,19 @@
 import { parseMcpTool } from '@shared/mcp'
 import type { McpCall, McpResult, ToolInUse } from '@shared/types'
 export { seniorityFor } from '@shared/seniority'
-import type { TranscriptEvent } from './parser'
+import type { TitleSource, TranscriptEvent } from './parser'
 
 export class AgentTracker {
   cwd: string | null = null
   branch: string | null = null
   model: string | null = null
-  title: string | null = null
+  /** Nomes da sessão por origem (ver TitleSource no parser). */
+  readonly titles: Partial<Record<TitleSource, string>> = {}
+  /** Primeiro e último pedido digitados pela pessoa. */
+  firstPrompt: string | null = null
+  lastPrompt: string | null = null
+  /** Horário da primeira linha com timestamp: quando a sessão começou. */
+  startedAt = 0
   contextTokens = 0
   outputTokens = 0
   cacheReadTokens = 0
@@ -28,7 +34,7 @@ export class AgentTracker {
   /** Aplica um evento. Retorna true se algo visível mudou. */
   apply(ev: TranscriptEvent): boolean {
     let changed = false
-    const set = <K extends 'cwd' | 'branch' | 'model' | 'title'>(key: K, value: this[K] | null): void => {
+    const set = <K extends 'cwd' | 'branch' | 'model'>(key: K, value: this[K] | null): void => {
       if (value !== null && this[key] !== value) {
         this[key] = value as this[K]
         changed = true
@@ -37,6 +43,7 @@ export class AgentTracker {
 
     set('cwd', ev.cwd)
     set('branch', ev.branch)
+    if (ev.timestamp !== null && (this.startedAt === 0 || ev.timestamp < this.startedAt)) this.startedAt = ev.timestamp
     if (ev.timestamp !== null && ev.timestamp > this.lastActivity) {
       this.lastActivity = ev.timestamp
       changed = true
@@ -44,7 +51,10 @@ export class AgentTracker {
 
     switch (ev.kind) {
       case 'title':
-        set('title', ev.title)
+        if (this.titles[ev.source] !== ev.title) {
+          this.titles[ev.source] = ev.title
+          changed = true
+        }
         break
 
       case 'assistant': {
@@ -73,6 +83,13 @@ export class AgentTracker {
       }
 
       case 'user':
+        if (ev.prompt !== null) {
+          this.firstPrompt ??= ev.prompt
+          if (this.lastPrompt !== ev.prompt) {
+            this.lastPrompt = ev.prompt
+            changed = true
+          }
+        }
         for (const r of ev.toolResults) {
           const call = this.pending.get(r.toolUseId)
           if (call) {
@@ -95,6 +112,12 @@ export class AgentTracker {
         break
     }
     return changed
+  }
+
+  /** Melhor nome vindo do transcript: o que a pessoa deu, depois o gerado. */
+  get title(): string | null {
+    const t = this.titles
+    return t.custom ?? t.agent ?? t.ai ?? t.summary ?? null
   }
 
   /** A ferramenta mais recente ainda sem resultado. */

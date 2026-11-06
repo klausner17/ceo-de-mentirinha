@@ -31,7 +31,7 @@ function demoMcp(step: number, server: string, from: number, to: number, ok: boo
 
 /** Estado das sessões falsas no passo `step` (um passo a cada poucos segundos). */
 export function demoSessions(now: number, step = 0, start = now): SessionState[] {
-  const base = { mcpCalls: [], mcpResults: [], outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null }
+  const base = { mcpCalls: [], mcpResults: [], outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null, startedAt: start - 40 * 60_000 }
   // Os liderados chegam no passo 2 e vão embora no passo 7 de cada ciclo de 10.
   const cycle = step % 10
   const jiraA = demoMcp(step, 'jira', 1, 4, true, start)
@@ -48,6 +48,7 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       model: 'claude-opus-5-5',
       seniority: 'diretor',
       title: 'Refatorar checkout',
+      lastPrompt: 'Separa o checkout em etapas e mantém os testes passando',
       contextTokens: 120_000 + (step % 5) * 15_000,
       currentTool: tool(DIRECTOR_TOOLS[step % DIRECTOR_TOOLS.length]!, now),
       lastActivity: now,
@@ -65,6 +66,7 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       model: 'claude-sonnet-5-5',
       seniority: 'pleno',
       title: 'Cupom de desconto',
+      lastPrompt: 'Adiciona cupom de desconto no carrinho',
       contextTokens: 40_000,
       currentTool: tool(PLENO_TOOLS[step % PLENO_TOOLS.length]!, now),
       // Um teste falha a cada ciclo: papel amassado e fumaça.
@@ -84,6 +86,7 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       model: 'claude-haiku-5-5',
       seniority: 'junior',
       title: 'Corrigir typos',
+      lastPrompt: 'Corrige os erros de digitação do último post',
       contextTokens: 8_000,
       currentTool: null,
       lastActivity: now - 20 * 60_000,

@@ -33,11 +33,23 @@ export interface AssistantEvent extends BaseEvent {
 export interface UserEvent extends BaseEvent {
   kind: 'user'
   toolResults: { toolUseId: string; isError: boolean }[]
+  /** Texto digitado pela pessoa (null em resultados de ferramenta, comandos e linhas internas). */
+  prompt: string | null
 }
+
+/**
+ * De onde veio o nome da sessão:
+ * - `custom`: a pessoa renomeou a sessão (/rename), linha `custom-title`;
+ * - `agent`: nome de agente/colega de equipe, linha `agent-name`;
+ * - `ai`: título curto gerado pelo Claude Code, linha `ai-title`;
+ * - `summary`: resumo de versões antigas, linha `summary`.
+ */
+export type TitleSource = 'custom' | 'agent' | 'ai' | 'summary'
 
 export interface TitleEvent extends BaseEvent {
   kind: 'title'
   title: string
+  source: TitleSource
 }
 
 export interface OtherEvent extends BaseEvent {
@@ -75,6 +87,25 @@ function contentBlocks(message: unknown): Json[] {
   return message.content.filter(isObj)
 }
 
+/**
+ * Texto de um prompt da pessoa: `content` em string ou blocos `text`. Comandos e avisos
+ * internos (que começam com `<`, como `<command-name>`) não contam como pedido.
+ */
+function promptText(message: unknown): string | null {
+  if (!isObj(message)) return null
+  const c = message.content
+  const text =
+    typeof c === 'string'
+      ? c
+      : contentBlocks(message)
+          .filter((b) => b.type === 'text')
+          .map((b) => str(b.text) ?? '')
+          .join('\n')
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (clean === '' || clean.startsWith('<') || clean.startsWith('[Request interrupted')) return null
+  return clean
+}
+
 /** Interpreta um objeto já decodificado. Retorna null se não for um objeto. */
 export function parseRecord(raw: unknown): TranscriptEvent | null {
   if (!isObj(raw)) return null
@@ -109,12 +140,20 @@ export function parseRecord(raw: unknown): TranscriptEvent | null {
       .filter((b) => b.type === 'tool_result')
       .map((b) => ({ toolUseId: str(b.tool_use_id) ?? '', isError: b.is_error === true }))
       .filter((t) => t.toolUseId !== '')
-    return { ...base, kind: 'user', toolResults }
+    const prompt = toolResults.length === 0 && raw.isMeta !== true ? promptText(raw.message) : null
+    return { ...base, kind: 'user', toolResults, prompt }
   }
 
-  if (type === 'ai-title') {
-    const title = str(raw.aiTitle)
-    if (title) return { ...base, kind: 'title', title }
+  const titleField: Record<string, [string, TitleSource]> = {
+    'custom-title': ['customTitle', 'custom'],
+    'agent-name': ['agentName', 'agent'],
+    'ai-title': ['aiTitle', 'ai'],
+    summary: ['summary', 'summary']
+  }
+  const titleOf = type ? titleField[type] : undefined
+  if (titleOf) {
+    const title = str(raw[titleOf[0]])?.trim()
+    if (title) return { ...base, kind: 'title', title, source: titleOf[1] }
   }
 
   return { ...base, kind: 'other', type }

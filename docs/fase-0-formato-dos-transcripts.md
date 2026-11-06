@@ -23,9 +23,12 @@ no parser para versões diferentes.
 | `type` | Uso no jogo |
 | --- | --- |
 | `assistant` | modelo, tokens, `tool_use`, `stop_reason` |
-| `user` | prompts e `tool_result` |
+| `user` | prompts (primeiro e último pedido, fora `isMeta` e comandos `<...>`) e `tool_result` |
 | `attachment` | só atualiza horário, `cwd` e branch |
-| `ai-title` | título curto da sessão (`aiTitle`), usado como nome na mesa |
+| `custom-title` | nome dado pela pessoa com `/rename` (`customTitle`); é o nome preferido da mesa (visto no binário do 2.1.319) |
+| `agent-name` | nome de agente/colega de equipe (`agentName`) |
+| `ai-title` | título curto da sessão (`aiTitle`), usado como nome na mesa quando não há nome dado |
+| `summary` | resumo (`summary`) de versões antigas; último recurso antes do primeiro pedido |
 | `tools-used`, `last-prompt`, `queue-operation`, `atis-latch` | ignorados por enquanto |
 
 Campos que não estavam no plano e podem ser úteis depois: `permissionMode` (linhas `user`,
@@ -38,3 +41,11 @@ de permissão de cada ferramenta), `effort`.
 - Valores do `status` no registro de processos além de `busy`.
 - Se o registro em `sessions/` é apagado quando a sessão fecha normalmente no macOS. O jogo
   também confere se o `pid` ainda existe, para não deixar mesa de processo morto.
+
+## Nome da sessão (2.1.319)
+
+O registro em `sessions/<pid>.json` tem `name` e `nameSource`. Com `nameSource: "derived"` o
+nome é só a pasta com um número (ex.: `ceo-de-mentirinha-29`), e por isso fica por último.
+Ordem usada pelo jogo (`sessionName` em `src/main/office-store.ts`): `custom-title`, nome do
+registro com `nameSource` `user`/`peer`/`hook`, `agent-name`, `ai-title`, `summary`, nome do
+registro com `nameSource: "auto"`, primeiro pedido digitado e, por fim, o nome derivado.
