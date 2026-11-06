@@ -11,6 +11,8 @@ import plenoUrl from '../../../assets/sprites/funcionario-pleno.png?url'
 import itensUrl from '../../../assets/sprites/itens.png?url'
 import mesaUrl from '../../../assets/sprites/mesa.png?url'
 import monitorUrl from '../../../assets/sprites/monitor.png?url'
+import portariaUrl from '../../../assets/sprites/portaria.png?url'
+import officeboyUrl from '../../../assets/sprites/officeboy.png?url'
 import tilesUrl from '../../../assets/sprites/tiles.png?url'
 
 /** Cada pixel da arte vira SCALE×SCALE pixels na tela. */
@@ -34,7 +36,7 @@ const POSES: Record<Pose, { frames: number[]; rate: number }> = {
 export type Screen = 'desligado' | 'codigo' | 'terminal' | 'navegador' | 'erro'
 export const SCREEN: Record<Screen, number> = { desligado: 0, codigo: 1, terminal: 2, navegador: 3, erro: 4 }
 
-export const ITEM = { papel: 0, amassado: 1, fumaca: 2, postit: 3, cafe: 4, suor: 5, z: 6, planta: 7, cadeira: 8 } as const
+export const ITEM = { papel: 0, amassado: 1, fumaca: 2, postit: 3, cafe: 4, suor: 5, z: 6, planta: 7, cadeira: 8, envelope: 9, interrogacao: 10 } as const
 
 /** Índices do tileset (iguais aos do script; no Tiled o gid é índice + 1). */
 export const TILES = {
@@ -47,15 +49,18 @@ export const animKey = (s: Seniority, pose: Pose) => `${s}-${pose}`
 
 export function preload(scene: Phaser.Scene): void {
   for (const s of SENIORITIES) scene.load.spritesheet(personKey(s), PEOPLE[s], { frameWidth: 16, frameHeight: 17 })
+  scene.load.spritesheet('officeboy', officeboyUrl, { frameWidth: 16, frameHeight: 17 })
   scene.load.spritesheet('itens', itensUrl, { frameWidth: 16, frameHeight: 16 })
   scene.load.spritesheet('monitor', monitorUrl, { frameWidth: 16, frameHeight: 12 })
   scene.load.spritesheet('tiles-quadros', tilesUrl, { frameWidth: 16, frameHeight: 16 })
   scene.load.image('mesa', mesaUrl)
+  scene.load.image('portaria', portariaUrl)
   scene.load.image('tiles', tilesUrl)
   scene.load.tilemapTiledJSON('escritorio', mapa)
 }
 
 export function createAnimations(scene: Phaser.Scene): void {
+  scene.anims.create({ key: 'officeboy-andando', frames: scene.anims.generateFrameNumbers('officeboy', { frames: [8, 9] }), frameRate: 8, repeat: -1 })
   for (const s of SENIORITIES) {
     for (const [pose, { frames, rate }] of Object.entries(POSES)) {
       scene.anims.create({

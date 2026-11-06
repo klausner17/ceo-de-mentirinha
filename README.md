@@ -55,6 +55,7 @@ Variáveis de ambiente:
 | Monitor vermelho, papel amassado e fumaça | uma ferramenta voltou com erro |
 | Dormindo com Z | sem escrita há `CEO_IDLE_MINUTES` |
 | Liderados | subagentes: entram pela porta da rua, atravessam o hall e o corredor, entram pela porta da ala, ficam ao lado do chefe e fazem o caminho de volta ao terminar |
+| Office boys na portaria | chamadas a conectores MCP: cada chamada sai da mesa e entra na fila do servidor na portaria. Volta com envelope se deu certo, ou de mãos vazias e perdido se falhou |
 | Log no rodapé | quem chegou, quem saiu e mudanças de ferramenta |
 
 Role com a roda do mouse ou arraste para andar pelo escritório.
@@ -93,6 +94,7 @@ assets/        pixel art e mapa do Tiled (gerados por scripts/gerar-arte.mjs)
 | 4. Atividade | Feita: pose e monitor por ferramenta, post-its, erro com papel amassado e fumaça, cansaço com contexto cheio, cochilo e pilha de papel animada. |
 | 5. Subagentes | Feita: liderados entram e saem pela porta. Falta validar com arquivos reais de subagente no Mac. |
 | 6. Arte e polimento | Feita com pixel art original gerada por script (MIT) e hall no formato do Tiled. |
+| Depois da v1: office boys de MCP | Feita, lendo só os transcripts ([demo](docs/office-boys-demo.png)). |
 
 ## Privacidade
 

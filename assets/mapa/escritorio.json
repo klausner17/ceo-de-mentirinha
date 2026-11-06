@@ -529,6 +529,18 @@
    "y": 0,
    "objects": [
     {
+     "id": 5,
+     "name": "portaria",
+     "type": "ponto",
+     "point": true,
+     "x": 120,
+     "y": 56,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true
+    },
+    {
      "id": 1,
      "name": "porta",
      "type": "ponto",

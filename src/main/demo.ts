@@ -1,7 +1,7 @@
 // Sessões falsas para o modo demo (CEO_DEMO=1). A cada passo algo muda, para mostrar
 // as animações das fases 4 e 5 sem precisar de Claude Code rodando.
 
-import type { SessionState, SubagentState, ToolInUse } from '@shared/types'
+import type { McpCall, McpResult, SessionState, SubagentState, ToolInUse } from '@shared/types'
 
 const tool = (name: string, now: number): ToolInUse => ({ id: `${name}-${now}`, name, startedAt: now })
 const sub = (id: string, agentType: string, model: string, working: boolean, now: number): SubagentState => ({
@@ -17,11 +17,26 @@ const sub = (id: string, agentType: string, model: string, working: boolean, now
 const DIRECTOR_TOOLS = ['Edit', 'Read', 'Agent', 'Bash', 'Grep', 'TodoWrite', 'WebSearch', 'mcp__jira__search']
 const PLENO_TOOLS = ['Bash', 'Bash', 'Read', 'Edit']
 
+/**
+ * Office boys do demo: a cada ciclo, dois pedidos ao Jira (formam fila) que voltam com
+ * o envelope, e um ao Google Drive que falha.
+ */
+function demoMcp(step: number, server: string, from: number, to: number, ok: boolean, start: number) {
+  const cycle = step % 10
+  const id = `${server}-${from}-${Math.floor(step / 10)}`
+  const calls: McpCall[] = cycle >= from && cycle < to ? [{ id, server, tool: 'busca', startedAt: start + from * 1000 }] : []
+  const results: McpResult[] = cycle >= to ? [{ id, server, ok, at: start + to * 1000 }] : []
+  return { calls, results }
+}
+
 /** Estado das sessões falsas no passo `step` (um passo a cada poucos segundos). */
 export function demoSessions(now: number, step = 0, start = now): SessionState[] {
-  const base = { outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null }
+  const base = { mcpCalls: [], mcpResults: [], outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null }
   // Os liderados chegam no passo 2 e vão embora no passo 7 de cada ciclo de 10.
   const cycle = step % 10
+  const jiraA = demoMcp(step, 'jira', 1, 4, true, start)
+  const jiraB = demoMcp(step, 'jira', 2, 6, true, start)
+  const drive = demoMcp(step, 'claude_ai_Google_Drive', 3, 6, false, start)
   const team = cycle >= 2 && cycle < 7 ? [sub('a1', 'Explore', 'claude-haiku-5-5', true, now), sub('a2', 'general-purpose', 'claude-sonnet-5-5', cycle % 2 === 0, now)] : []
   return [
     {
@@ -37,6 +52,8 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       currentTool: tool(DIRECTOR_TOOLS[step % DIRECTOR_TOOLS.length]!, now),
       lastActivity: now,
       status: 'trabalhando',
+      mcpCalls: [...jiraA.calls, ...jiraB.calls],
+      mcpResults: [...jiraA.results, ...jiraB.results],
       subagents: team
     },
     {
@@ -54,6 +71,8 @@ export function demoSessions(now: number, step = 0, start = now): SessionState[]
       lastErrorAt: cycle >= 4 ? start + (step - cycle + 4) * 3000 : null,
       lastActivity: now,
       status: 'trabalhando',
+      mcpCalls: drive.calls,
+      mcpResults: drive.results,
       subagents: []
     },
     {

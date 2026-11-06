@@ -1,7 +1,8 @@
 // Acumula os eventos de UM transcript (sessão principal ou subagente).
 // Não conhece arquivos nem relógio: recebe eventos e devolve números.
 
-import type { ToolInUse } from '@shared/types'
+import { parseMcpTool } from '@shared/mcp'
+import type { McpCall, McpResult, ToolInUse } from '@shared/types'
 export { seniorityFor } from '@shared/seniority'
 import type { TranscriptEvent } from './parser'
 
@@ -21,6 +22,8 @@ export class AgentTracker {
   private readonly countedMessages = new Set<string>()
   /** tool_use sem tool_result, na ordem em que apareceram. */
   private readonly pending = new Map<string, ToolInUse>()
+  /** Últimas chamadas MCP terminadas (as mais recentes no fim). */
+  private readonly mcpDone: McpResult[] = []
 
   /** Aplica um evento. Retorna true se algo visível mudou. */
   apply(ev: TranscriptEvent): boolean {
@@ -71,7 +74,16 @@ export class AgentTracker {
 
       case 'user':
         for (const r of ev.toolResults) {
-          if (this.pending.delete(r.toolUseId)) changed = true
+          const call = this.pending.get(r.toolUseId)
+          if (call) {
+            this.pending.delete(r.toolUseId)
+            changed = true
+            const mcp = parseMcpTool(call.name)
+            if (mcp) {
+              this.mcpDone.push({ id: call.id, server: mcp.server, ok: !r.isError, at: ev.timestamp ?? this.lastActivity })
+              if (this.mcpDone.length > 20) this.mcpDone.shift()
+            }
+          }
           if (r.isError) {
             this.lastErrorAt = ev.timestamp ?? this.lastActivity
             changed = true
@@ -90,6 +102,21 @@ export class AgentTracker {
     let last: ToolInUse | null = null
     for (const t of this.pending.values()) last = t
     return last
+  }
+
+  /** Chamadas MCP ainda sem resultado. */
+  get mcpCalls(): McpCall[] {
+    const out: McpCall[] = []
+    for (const t of this.pending.values()) {
+      const mcp = parseMcpTool(t.name)
+      if (mcp) out.push({ id: t.id, server: mcp.server, tool: mcp.tool, startedAt: t.startedAt })
+    }
+    return out
+  }
+
+  /** Chamadas MCP terminadas desde `since`. */
+  mcpResultsSince(since: number): McpResult[] {
+    return this.mcpDone.filter((r) => r.at >= since)
   }
 
   get pendingCount(): number {

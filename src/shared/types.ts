@@ -14,6 +14,22 @@ export interface ToolInUse {
   startedAt: number
 }
 
+/** Uma chamada MCP em andamento: o office boy indo à portaria. */
+export interface McpCall {
+  id: string
+  server: string
+  tool: string
+  startedAt: number
+}
+
+/** Uma chamada MCP que acabou há pouco: o office boy voltando. */
+export interface McpResult {
+  id: string
+  server: string
+  ok: boolean
+  at: number
+}
+
 export interface SubagentState {
   id: string
   /** Tipo do agente, lido do agent-<id>.meta.json quando existe. */
@@ -51,6 +67,10 @@ export interface SessionState {
   /** Horário do último tool_result com erro (papel amassado e fumaça). */
   lastErrorAt: number | null
   status: DeskStatus
+  /** Chamadas MCP sem resultado ainda (office boys na rua). */
+  mcpCalls: McpCall[]
+  /** Chamadas MCP que terminaram nos últimos segundos. */
+  mcpResults: McpResult[]
   /** true quando o registro em ~/.claude/sessions indica um processo vivo. */
   running: boolean
   subagents: SubagentState[]

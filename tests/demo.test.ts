@@ -14,3 +14,12 @@ describe('demoSessions', () => {
     expect(errorAt(14)).not.toBe(errorAt(4))
   })
 })
+
+describe('office boys do demo', () => {
+  it('forma fila no Jira e o Drive falha', () => {
+    const at = (step: number) => demoSessions(0, step, 0)
+    expect(at(3)[0]!.mcpCalls.map((c) => c.server)).toEqual(['jira', 'jira'])
+    expect(at(4)[0]!.mcpResults).toMatchObject([{ server: 'jira', ok: true }])
+    expect(at(6)[1]!.mcpResults).toMatchObject([{ server: 'claude_ai_Google_Drive', ok: false }])
+  })
+})
