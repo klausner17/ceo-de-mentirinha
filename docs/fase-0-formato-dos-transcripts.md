@@ -49,3 +49,21 @@ nome é só a pasta com um número (ex.: `ceo-de-mentirinha-29`), e por isso fic
 Ordem usada pelo jogo (`sessionName` em `src/main/office-store.ts`): `custom-title`, nome do
 registro com `nameSource` `user`/`peer`/`hook`, `agent-name`, `ai-title`, `summary`, nome do
 registro com `nameSource: "auto"`, primeiro pedido digitado e, por fim, o nome derivado.
+
+## Esperando o CEO (2.1.319)
+
+O registro em `sessions/<pid>.json` também tem `status` e `waitingFor`, visto no binário do
+2.1.319: `busy` durante um turno, `idle` esperando o próximo pedido e `waiting` quando a sessão
+precisa da pessoa, com `waitingFor` dizendo o quê (`permission prompt`, `input needed`,
+`dialog open`, …). O jogo lê isso sem escrever nada e sem hooks (`awaitingFor` em
+`src/main/office-store.ts`) e mostra um email não lido no computador do CEO:
+
+| Situação | Sinal | Email |
+| --- | --- | --- |
+| Pedido de permissão | `status: "waiting"` + `waitingFor: "permission prompt"` | "Posso usar Bash?" |
+| Pergunta | `AskUserQuestion` sem `tool_result`, ou `status: "waiting"` por outro motivo | "Tenho uma pergunta para você" |
+| Turno terminado | `stop_reason: "end_turn"` sem ferramenta pendente, com `status` `idle` ou sem registro | "Terminei: …" |
+
+Sem o registro (versões antigas), um pedido de permissão parece só uma ferramenta lenta e não
+vira email. Ainda falta confirmar no Mac que o `status` muda para `waiting` nos pedidos de
+permissão.

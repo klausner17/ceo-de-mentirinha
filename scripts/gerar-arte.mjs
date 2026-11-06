@@ -238,7 +238,7 @@ const DESK = Array.from({ length: 20 }, (_, y) => {
 })
 sheet('mesa', 48, 20, [DESK.join('\n')], { k: '#2a1c12', M: '#a8754a', m: '#b98556', D: '#7a5232', d: '#8b5e3c' })
 
-// Quadros do monitor: desligado, código, terminal, navegador, erro.
+// Quadros do monitor: desligado, código, terminal, navegador, erro, email.
 const MONITOR = (screen) => `
 kkkkkkkkkkkkkkkk
 k${screen[0]}k
@@ -257,7 +257,9 @@ sheet('monitor', 16, 12, [
   MONITOR(['bbbbbbbbbbbbbb', 'byyyybbbbbbbbb', 'bbbggggggbbbbb', 'bbbgggbwwwwbbb', 'bbbbbbbbbbbbbb', 'byyybgggggbbbb', 'bbbbbbbbbbbbbb']),
   MONITOR(['oooooooooooooo', 'oGoGGGGooooooo', 'oooooooooooooo', 'oGoGGGGGGGoooo', 'oooooooooooooo', 'oGoWoooooooooo', 'oooooooooooooo']),
   MONITOR(['LLLLLLLLLLLLLL', 'Lwwwwwwwwwwwwl', 'lwbbbbwwwwwwwl', 'lwwwwwwwwwwwwl', 'lwbbbbbbbbbwwl', 'lwwwwwwwwwwwwl', 'llllllllllllll']),
-  MONITOR(['rrrrrrrrrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrrrrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrrrrrrrrr'])
+  MONITOR(['rrrrrrrrrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrrrrrrrrr', 'rrrrrrwwrrrrrr', 'rrrrrrrrrrrrrr']),
+  // Caixa de entrada: envelope na tela do computador do CEO.
+  MONITOR(['bbbbbbbbbbbbbb', 'bbwwwwwwwwwwbb', 'bbwbwwwwwwbwbb', 'bbwwbbwwbbwwbb', 'bbwwwwbbwwwwbb', 'bbwwwwwwwwwwbb', 'bbbbbbbbbbbbbb'])
 ].map((m) => m.trim()), {
   k: '#14151a', o: '#0b0c10', b: '#1e2a3a', y: '#c792ea', g: '#c3e88d', w: '#e8e6e3', G: '#7ee787', W: '#e8e6e3',
   L: '#5a8fd8', l: '#cfd8e8', r: '#b3261e'

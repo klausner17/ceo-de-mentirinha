@@ -118,4 +118,62 @@ describe('OfficeStore', () => {
     // Depois de 30 segundos o resultado some (o office boy já voltou).
     expect(store.snapshot(T0 + 100_000)[0]!.mcpResults).toEqual([])
   })
+
+  describe('esperando o CEO (emails)', () => {
+    const line = (o: object) => JSON.stringify({ sessionId: SESSION, cwd: '/Users/ceo/code/loja', isSidechain: false, ...o })
+    const ask = line({
+      type: 'assistant',
+      timestamp: '2026-11-06T14:00:30.000Z',
+      message: { id: 'msg_Q', model: 'claude-sonnet-5-5', content: [{ type: 'tool_use', id: 'toolu_q', name: 'AskUserQuestion' }], stop_reason: 'tool_use' }
+    })
+
+    it('sem registro: o fim do turno vira relatório; ferramenta em andamento não', () => {
+      const store = newStore()
+      store.ingestSession(SESSION, lines('session-2.1.318-tool-pending.jsonl'))
+      expect(store.snapshot(T0 + 10_000)[0]!.awaiting).toBeNull()
+      store.ingestSession(SESSION, lines('session-2.1.318-turn-end.jsonl'))
+      expect(store.snapshot(T0 + 10_000)[0]!.awaiting).toEqual({ reason: 'relatorio', since: T0 + 7_000, detail: null })
+    })
+
+    it('sem registro: AskUserQuestion pendente é uma pergunta', () => {
+      const store = newStore()
+      store.ingestSession(SESSION, [...lines('session-2.1.318-turn-end.jsonl'), ask])
+      expect(store.snapshot(T0 + 40_000)[0]!.awaiting).toEqual({ reason: 'pergunta', since: T0 + 30_000, detail: null })
+    })
+
+    it('registro "waiting" com permission prompt: pedido de permissão da ferramenta pendente', () => {
+      const store = newStore([4343])
+      store.ingestSession(SESSION, lines('session-2.1.318-tool-pending.jsonl'))
+      store.setRegistry(4343, fixture('registry-2.1.319-waiting.json'))
+      expect(store.snapshot(T0 + 60_000)[0]!.awaiting).toEqual({ reason: 'permissao', since: T0 + 4_000, detail: 'Edit' })
+    })
+
+    it('registro "waiting" com AskUserQuestion pendente continua sendo pergunta', () => {
+      const store = newStore([4343])
+      store.ingestSession(SESSION, [...lines('session-2.1.318-turn-end.jsonl'), ask])
+      store.setRegistry(4343, fixture('registry-2.1.319-waiting.json'))
+      expect(store.snapshot(T0 + 60_000)[0]!.awaiting).toMatchObject({ reason: 'pergunta' })
+    })
+
+    it('registro "waiting" por um diálogo vira pergunta com o motivo', () => {
+      const store = newStore([4343])
+      store.ingestSession(SESSION, lines('session-2.1.318-turn-end.jsonl'))
+      store.setRegistry(4343, fixture('registry-2.1.319-waiting.json').replace('permission prompt', 'dialog open'))
+      expect(store.snapshot(T0 + 60_000)[0]!.awaiting).toMatchObject({ reason: 'pergunta', detail: 'dialog open' })
+    })
+
+    it('registro "busy" não é email, mesmo com o turno anterior terminado', () => {
+      const store = newStore([4242])
+      store.ingestSession(SESSION, lines('session-2.1.318-turn-end.jsonl'))
+      store.setRegistry(4242, fixture('registry-4242.json'))
+      expect(store.snapshot(T0 + 60_000)[0]!.awaiting).toBeNull()
+    })
+
+    it('registro "idle" com o turno terminado é relatório', () => {
+      const store = newStore([4242])
+      store.ingestSession(SESSION, lines('session-2.1.318-turn-end.jsonl'))
+      store.setRegistry(4242, fixture('registry-4242.json').replace('"busy"', '"idle"'))
+      expect(store.snapshot(T0 + 60_000)[0]!.awaiting).toMatchObject({ reason: 'relatorio' })
+    })
+  })
 })

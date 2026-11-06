@@ -24,6 +24,7 @@ const session = (over: Partial<SessionState> = {}): SessionState => ({
   mcpCalls: [],
   mcpResults: [],
   running: true,
+  awaiting: null,
   subagents: [],
   ...over
 })

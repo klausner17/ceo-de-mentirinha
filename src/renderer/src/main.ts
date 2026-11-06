@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import type { OfficeDelta, SessionState } from '@shared/types'
-import { deskLine, doing, roomKey, roomPeople, sessionDetails, sessionTitle } from './describe'
+import { ago, deskLine, doing, roomKey, roomPeople, sessionDetails, sessionTitle } from './describe'
+import { emailKey, emailSubject, inbox, unreadCount } from './inbox'
 import { OfficeScene, type Selection } from './scenes/OfficeScene'
 
 const logEl = document.getElementById('log')!
@@ -44,10 +45,31 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: 
   return e
 }
 
+// Caixa de entrada do CEO: chaves dos emails já lidos (só nesta janela; reabrir o app zera).
+const read = new Set<string>()
+
+/** Abrir a mesa de quem mandou o email conta como ler. */
+function markRead(id: string): void {
+  const a = known.get(id)?.awaiting
+  if (a) read.add(emailKey(id, a))
+}
+
+/** Atualiza o contador no computador do CEO e o título da janela. */
+function refreshInbox(): void {
+  const emails = inbox(known.values(), read)
+  const live = new Set(emails.map((e) => e.key))
+  for (const k of read) if (!live.has(k)) read.delete(k)
+  const unread = unreadCount(emails)
+  scene.setInbox(unread, emails.length)
+  document.title = unread > 0 ? `(${unread}) CEO de Mentirinha` : 'CEO de Mentirinha'
+}
+
 function select(sel: Selection | null): void {
   selected = sel
+  if (sel?.kind === 'session') markRead(sel.id)
   scene.select(sel)
   renderDetails()
+  refreshInbox()
 }
 
 function renderDetails(): void {
@@ -72,6 +94,37 @@ function renderDetails(): void {
       detailsEl.hidden = false
       return
     }
+  }
+
+  if (selected?.kind === 'inbox') {
+    const emails = inbox(known.values(), read)
+    const unread = unreadCount(emails)
+    const body: HTMLElement[] = [close, el('h2', 'Caixa de entrada')]
+    body.push(el('p', emails.length === 0 ? 'Ninguém precisa de você agora.' : `${unread} não lido(s) de ${emails.length}`, 'sub'))
+    if (emails.length > 0) {
+      const ul = el('ul')
+      for (const e of emails) {
+        const btn = el('button', `${e.unread ? '● ' : ''}${e.subject}`, e.unread ? 'unread' : undefined)
+        btn.append(el('small', `${e.from} · Ala ${e.project} · ${ago(e.since, now)}`))
+        btn.onclick = () => select({ kind: 'session', id: e.sessionId })
+        const li = el('li')
+        li.append(btn)
+        ul.append(li)
+      }
+      body.push(ul)
+      if (unread > 0) {
+        const all = el('button', 'Marcar todos como lidos', 'link')
+        all.onclick = () => {
+          for (const e of emails) read.add(e.key)
+          renderDetails()
+          refreshInbox()
+        }
+        body.push(all)
+      }
+    }
+    detailsEl.replaceChildren(...body)
+    detailsEl.hidden = false
+    return
   }
 
   if (selected?.kind === 'room') {
@@ -113,13 +166,23 @@ function apply(delta: OfficeDelta): void {
       known.clear()
       for (const s of delta.sessions) known.set(s.id, s)
       scene.setSessions(delta.sessions)
+      refreshInbox()
       renderDetails()
       log('info', `${delta.sessions.length} sessão(ões) no escritório`)
       break
     case 'upsert': {
-      const before = known.get(delta.session.id)
-      known.set(delta.session.id, delta.session)
-      scene.upsert(delta.session)
+      const s = delta.session
+      const before = known.get(s.id)
+      known.set(s.id, s)
+      scene.upsert(s)
+      // Email novo: alguém passou a esperar o CEO (ou por outro motivo).
+      const a = s.awaiting
+      if (a && (!before?.awaiting || emailKey(s.id, before.awaiting) !== emailKey(s.id, a))) {
+        // Quem está com a mesa aberta no painel já está lendo.
+        if (selected?.kind === 'session' && selected.id === s.id) read.add(emailKey(s.id, a))
+        else log(a.reason === 'relatorio' ? 'info' : 'warn', `Email de ${sessionTitle(s)}: ${emailSubject(s, a)}`)
+      }
+      refreshInbox()
       if (selected) renderDetails()
       if (!before) log('info', `Chegou: ${describe(delta.session)}`)
       else if (before.currentTool?.id !== delta.session.currentTool?.id || before.status !== delta.session.status)
@@ -130,6 +193,7 @@ function apply(delta: OfficeDelta): void {
       const gone = known.get(delta.id)
       known.delete(delta.id)
       scene.remove(delta.id)
+      refreshInbox()
       renderDetails()
       log('info', `Foi embora: ${gone ? sessionTitle(gone) : delta.id.slice(0, 8)}`)
       break

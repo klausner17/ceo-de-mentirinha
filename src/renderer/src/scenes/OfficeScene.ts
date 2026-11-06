@@ -4,7 +4,7 @@
 
 import Phaser from 'phaser'
 import type { SessionState } from '@shared/types'
-import { createAnimations, mapa, personKey, preload, SCALE, TILE, TILES } from '../art'
+import { createAnimations, mapa, personKey, preload, SCALE, SCREEN, TILE, TILES } from '../art'
 import { buildNav, type HallMap, type Rect } from '../nav'
 import { planHouse, type HouseFrame, type Room, WALL_TILES } from '../house'
 import { roomKey, roomPeople } from '../describe'
@@ -17,8 +17,8 @@ const WALL = TILE * WALL_TILES
 const DESKS_PER_ROW = 2
 const DESK_SIZE = { w: DESK_W, h: DESK_H, gap: GAP, pad: WING_PAD, perRow: DESKS_PER_ROW }
 
-/** O que foi clicado: uma mesa (sessão) ou a placa de um cômodo (projeto). */
-export type Selection = { kind: 'session'; id: string } | { kind: 'room'; key: string }
+/** O que foi clicado: uma mesa (sessão), a placa de um cômodo (projeto) ou o computador do CEO. */
+export type Selection = { kind: 'session'; id: string } | { kind: 'room'; key: string } | { kind: 'inbox' }
 
 /** A mesa, a cadeira e o funcionário sentado bloqueiam a passagem; a plaquinha com o nome não. */
 function deskObstacle(at: { x: number; y: number }): Rect {
@@ -34,6 +34,12 @@ export class OfficeScene extends Phaser.Scene {
   private boys?: OfficeBoys
   /** Móveis do hall que não estão no tileset (portaria, mesa do CEO). */
   private hallObstacles: Rect[] = []
+  /** Computador do CEO e o contador de emails não lidos em cima dele. */
+  private ceoMonitor?: Phaser.GameObjects.Sprite
+  private badge?: Phaser.GameObjects.Container
+  private badgeText?: Phaser.GameObjects.Text
+  /** Último pedido de setInbox, aplicado quando a cena fica pronta. */
+  private inboxState = { unread: 0, total: 0 }
   private ready = false
   private selection: Selection | null = null
   /** Avisado quando a pessoa clica numa mesa ou na placa de um cômodo. */
@@ -107,10 +113,39 @@ export class OfficeScene extends Phaser.Scene {
     this.hallObstacles.push({ x: ceo.x - 48, y: ceo.y - 30, w: 96, h: 66 })
     this.add.sprite(ceo.x, ceo.y + 4, personKey('diretor'), 0).setScale(SCALE).setOrigin(0.5, 1).setDepth(1)
     this.add.image(ceo.x, ceo.y - 4, 'mesa').setScale(SCALE).setOrigin(0.5, 0).setDepth(1)
+    this.buildCeoComputer(ceo.x - 34, ceo.y + 4)
     this.add
       .text(ceo.x, ceo.y + 38, 'você', { fontFamily: FONT, fontSize: '11px', color: '#1d1f27', backgroundColor: '#e8c35b', padding: { x: 4, y: 1 } })
       .setOrigin(0.5, 0)
       .setDepth(1)
+  }
+
+  /**
+   * O computador do CEO: quando alguém precisa de uma resposta, a tela mostra um envelope
+   * e aparece o contador de emails não lidos. Clicar abre a caixa de entrada.
+   */
+  private buildCeoComputer(x: number, y: number): void {
+    const monitor = this.add.sprite(x, y, 'monitor', SCREEN.desligado).setScale(SCALE).setOrigin(0.5, 1).setDepth(2)
+    this.ceoMonitor = monitor
+    const top = y - 12 * SCALE
+    const circle = this.add.circle(0, 0, 10, 0xd7263d).setStrokeStyle(2, 0xffffff)
+    this.badgeText = this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5)
+    this.badge = this.add.container(x + 7 * SCALE, top - 4, [circle, this.badgeText]).setDepth(3).setVisible(false)
+    this.tweens.add({ targets: this.badge, scale: { from: 1, to: 1.15 }, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    const hit = this.add.zone(x, y - 6 * SCALE, 16 * SCALE + 12, 12 * SCALE + 12).setInteractive({ useHandCursor: true }).setDepth(3)
+    hit.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.getDistance() < 6) this.onSelect({ kind: 'inbox' })
+    })
+    this.setInbox(this.inboxState.unread, this.inboxState.total)
+  }
+
+  /** Atualiza o computador do CEO: `unread` emails não lidos de `total` na caixa. */
+  setInbox(unread: number, total: number): void {
+    this.inboxState = { unread, total }
+    if (!this.ceoMonitor || !this.badge || !this.badgeText) return
+    this.ceoMonitor.setFrame(total > 0 ? SCREEN.email : SCREEN.desligado)
+    this.badgeText.setText(unread > 99 ? '99+' : String(unread))
+    this.badge.setVisible(unread > 0)
   }
 
   private setupCamera(): void {
