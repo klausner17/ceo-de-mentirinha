@@ -168,6 +168,7 @@ export class OfficeStore {
         model: t.model,
         currentTool: t.currentTool,
         lastActivity: t.lastActivity,
+        lastErrorAt: t.lastErrorAt,
         finished: false
       })
     }
@@ -184,10 +185,12 @@ export class OfficeStore {
       seniority: seniorityFor(main.model),
       title: main.title ?? reg?.name ?? null,
       contextTokens: main.contextTokens,
+      contextLimit: main.contextTokens > 200_000 ? 1_000_000 : 200_000,
       outputTokens: main.outputTokens,
       cacheReadTokens: main.cacheReadTokens,
       currentTool: main.currentTool,
       lastActivity: main.lastActivity,
+      lastErrorAt: main.lastErrorAt,
       status: busy ? 'trabalhando' : 'ocioso',
       running,
       subagents

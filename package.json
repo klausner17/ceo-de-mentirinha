@@ -5,12 +5,15 @@
   "description": "Escritório 2D que mostra as sessões do Claude Code como funcionários. Somente leitura.",
   "main": "./out/main/index.js",
   "scripts": {
+    "predev": "node scripts/garantir-electron.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "prestart": "node scripts/garantir-electron.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "inspect": "node scripts/inspect-transcripts.mjs"
+    "inspect": "node scripts/inspect-transcripts.mjs",
+    "arte": "node scripts/gerar-arte.mjs"
   },
   "license": "MIT",
   "dependencies": {

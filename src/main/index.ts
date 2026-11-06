@@ -43,7 +43,7 @@ app.whenReady().then(() => {
   ipcMain.handle(IPC.snapshot, () => (demo ? demoSessions(Date.now()) : store.snapshot()))
   store.onDelta(send)
 
-  const stop = demo ? null : watchClaude(store)
+  const stop = demo ? startDemo() : watchClaude(store)
   createWindow()
 
   app.on('activate', () => {
@@ -51,6 +51,17 @@ app.whenReady().then(() => {
   })
   app.on('will-quit', () => void stop?.())
 })
+
+/** Modo demo: as sessões falsas mudam a cada 3 segundos. */
+function startDemo(): () => Promise<void> {
+  const started = Date.now()
+  let step = 0
+  const timer = setInterval(() => {
+    step++
+    for (const session of demoSessions(Date.now(), step, started)) send({ kind: 'upsert', session })
+  }, 3000)
+  return async () => clearInterval(timer)
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

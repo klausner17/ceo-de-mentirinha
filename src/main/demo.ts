@@ -1,14 +1,28 @@
-// Sessões falsas para o modo demo (CEO_DEMO=1) e para testar o renderer.
+// Sessões falsas para o modo demo (CEO_DEMO=1). A cada passo algo muda, para mostrar
+// as animações das fases 4 e 5 sem precisar de Claude Code rodando.
 
-import type { SessionState } from '@shared/types'
+import type { SessionState, SubagentState, ToolInUse } from '@shared/types'
 
-export function demoSessions(now: number): SessionState[] {
-  const base = {
-    outputTokens: 12_000,
-    cacheReadTokens: 400_000,
-    running: true,
-    subagents: []
-  }
+const tool = (name: string, now: number): ToolInUse => ({ id: `${name}-${now}`, name, startedAt: now })
+const sub = (id: string, agentType: string, model: string, working: boolean, now: number): SubagentState => ({
+  id,
+  agentType,
+  model,
+  currentTool: working ? tool('Grep', now) : null,
+  lastActivity: now,
+  lastErrorAt: null,
+  finished: false
+})
+
+const DIRECTOR_TOOLS = ['Edit', 'Read', 'Agent', 'Bash', 'Grep', 'TodoWrite', 'WebSearch', 'mcp__jira__search']
+const PLENO_TOOLS = ['Bash', 'Bash', 'Read', 'Edit']
+
+/** Estado das sessões falsas no passo `step` (um passo a cada poucos segundos). */
+export function demoSessions(now: number, step = 0, start = now): SessionState[] {
+  const base = { outputTokens: 12_000, cacheReadTokens: 400_000, running: true, contextLimit: 200_000, lastErrorAt: null }
+  // Os liderados chegam no passo 2 e vão embora no passo 7 de cada ciclo de 10.
+  const cycle = step % 10
+  const team = cycle >= 2 && cycle < 7 ? [sub('a1', 'Explore', 'claude-haiku-5-5', true, now), sub('a2', 'general-purpose', 'claude-sonnet-5-5', cycle % 2 === 0, now)] : []
   return [
     {
       ...base,
@@ -19,14 +33,11 @@ export function demoSessions(now: number): SessionState[] {
       model: 'claude-opus-5-5',
       seniority: 'diretor',
       title: 'Refatorar checkout',
-      contextTokens: 150_000,
-      currentTool: { id: 't1', name: 'Edit', startedAt: now },
+      contextTokens: 120_000 + (step % 5) * 15_000,
+      currentTool: tool(DIRECTOR_TOOLS[step % DIRECTOR_TOOLS.length]!, now),
       lastActivity: now,
       status: 'trabalhando',
-      subagents: [
-        { id: 'a1', agentType: 'Explore', model: 'claude-haiku-5-5', currentTool: { id: 't2', name: 'Grep', startedAt: now }, lastActivity: now, finished: false },
-        { id: 'a2', agentType: 'general-purpose', model: 'claude-sonnet-5-5', currentTool: null, lastActivity: now, finished: false }
-      ]
+      subagents: team
     },
     {
       ...base,
@@ -38,9 +49,12 @@ export function demoSessions(now: number): SessionState[] {
       seniority: 'pleno',
       title: 'Cupom de desconto',
       contextTokens: 40_000,
-      currentTool: { id: 't3', name: 'Bash', startedAt: now },
+      currentTool: tool(PLENO_TOOLS[step % PLENO_TOOLS.length]!, now),
+      // Um teste falha a cada ciclo: papel amassado e fumaça.
+      lastErrorAt: cycle >= 4 ? start + (step - cycle + 4) * 3000 : null,
       lastActivity: now,
-      status: 'trabalhando'
+      status: 'trabalhando',
+      subagents: []
     },
     {
       ...base,
@@ -54,7 +68,8 @@ export function demoSessions(now: number): SessionState[] {
       contextTokens: 8_000,
       currentTool: null,
       lastActivity: now - 20 * 60_000,
-      status: 'ocioso'
+      status: 'ocioso',
+      subagents: []
     }
   ]
 }
