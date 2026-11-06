@@ -27,6 +27,7 @@ Outros comandos:
 | `npm run build` | build de produção em `out/` |
 | `npm start` | roda o build de produção |
 | `npm run inspect` | Fase 0: mostra a estrutura dos seus transcripts (só nomes de campos, nunca conteúdo) |
+| `npm run arte` | Fase 6: gera de novo a pixel art e o mapa do hall a partir de `scripts/gerar-arte.mjs` |
 
 Variáveis de ambiente:
 
@@ -41,14 +42,21 @@ Variáveis de ambiente:
 
 | No jogo | No Claude Code |
 | --- | --- |
+| Hall de entrada | mapa do Tiled (`assets/mapa/escritorio.json`): porta, estante de skills, fichário, café e a Sala do CEO (você) |
 | Ala | projeto (`cwd`) |
 | Mesa | sessão ativa, ordenada por branch dentro da ala |
-| Crachá | modelo: Opus = diretor, Sonnet = pleno, Haiku = júnior |
-| Pilha de papel | contexto do último turno (uma folha a cada 20 mil tokens; fica rosa perto de 200 mil) |
-| Balão acima da cabeça | ferramenta em uso (Read = "Lendo uma pasta", Bash = "No terminal", MCP = "Office boy") |
-| z z z | sem escrita há `CEO_IDLE_MINUTES` |
-| Bolinhas verdes ao lado | subagentes (liderados) |
+| Cor da roupa | modelo: Opus = diretor (roxo), Sonnet = pleno (azul), Haiku = júnior (verde-água) |
+| Pose e monitor | ferramenta em uso: digitando (Edit, Bash), lendo uma pasta (Read, Web), lupa (Grep, Glob), apontando (Agent) |
+| Balão acima da cabeça | nome da ferramenta em uso; MCP aparece como "Office boy" |
+| Post-its na mesa | lista de TODOs sendo atualizada |
+| Pilha de papel | contexto do último turno (uma folha a cada 20 mil tokens); folhas novas caem na pilha |
+| Suor, café e papel rosado | contexto acima de 80% do limite |
+| Monitor vermelho, papel amassado e fumaça | uma ferramenta voltou com erro |
+| Dormindo com Z | sem escrita há `CEO_IDLE_MINUTES` |
+| Liderados | subagentes: entram pela porta do hall, ficam ao lado do chefe e saem pela porta ao terminar |
 | Log no rodapé | quem chegou, quem saiu e mudanças de ferramenta |
+
+Role com a roda do mouse ou arraste para andar pelo escritório.
 
 ## Arquitetura
 
@@ -68,9 +76,9 @@ src/
   renderer/    Phaser: cena do escritório e mesas
   shared/      tipos usados pelos dois lados
 fixtures/      transcripts sintéticos para os testes
-scripts/       inspeção da Fase 0
+scripts/       inspeção da Fase 0 e gerador da arte
 docs/          resultado da Fase 0
-assets/        arte e mapa (fase 6), com a licença de cada pacote
+assets/        pixel art e mapa do Tiled (gerados por scripts/gerar-arte.mjs)
 ```
 
 ## Andamento do plano
@@ -81,9 +89,9 @@ assets/        arte e mapa (fase 6), com a licença de cada pacote
 | 1. Esqueleto | Feita: Electron + Vite + TypeScript + Phaser, ponte main/preload/renderer, modo demo. |
 | 2. Leitura dos dados | Feita, com testes. Testada contra uma sessão real do Claude Code. |
 | 3. Uma mesa por sessão | Feita com formas simples. Falta conferir no Mac abrindo e fechando sessões no terminal. |
-| 4. Atividade | Parcial: balão da ferramenta, funcionário balançando durante a tool call, cochilo e pilha de papel. |
-| 5. Subagentes | Parcial: liderados aparecem ao lado da mesa; falta validar com arquivos reais. |
-| 6. Arte e polimento | Não começada. |
+| 4. Atividade | Feita: pose e monitor por ferramenta, post-its, erro com papel amassado e fumaça, cansaço com contexto cheio, cochilo e pilha de papel animada. |
+| 5. Subagentes | Feita: liderados entram e saem pela porta. Falta validar com arquivos reais de subagente no Mac. |
+| 6. Arte e polimento | Feita com pixel art original gerada por script (MIT) e hall no formato do Tiled. |
 
 ## Privacidade
 

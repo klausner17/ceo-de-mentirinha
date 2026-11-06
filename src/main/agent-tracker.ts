@@ -1,16 +1,9 @@
 // Acumula os eventos de UM transcript (sessão principal ou subagente).
 // Não conhece arquivos nem relógio: recebe eventos e devolve números.
 
-import type { Seniority, ToolInUse } from '@shared/types'
+import type { ToolInUse } from '@shared/types'
+export { seniorityFor } from '@shared/seniority'
 import type { TranscriptEvent } from './parser'
-
-export function seniorityFor(model: string | null): Seniority {
-  const m = (model ?? '').toLowerCase()
-  if (m.includes('opus')) return 'diretor'
-  if (m.includes('sonnet')) return 'pleno'
-  if (m.includes('haiku')) return 'junior'
-  return 'desconhecido'
-}
 
 export class AgentTracker {
   cwd: string | null = null
@@ -22,6 +15,7 @@ export class AgentTracker {
   cacheReadTokens = 0
   lastActivity = 0
   lastStopReason: string | null = null
+  lastErrorAt: number | null = null
 
   /** message.id já contabilizados: uma resposta vira várias linhas com o mesmo usage. */
   private readonly countedMessages = new Set<string>()
@@ -78,6 +72,10 @@ export class AgentTracker {
       case 'user':
         for (const r of ev.toolResults) {
           if (this.pending.delete(r.toolUseId)) changed = true
+          if (r.isError) {
+            this.lastErrorAt = ev.timestamp ?? this.lastActivity
+            changed = true
+          }
         }
         break
 

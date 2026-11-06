@@ -10,3 +10,5 @@ Textos, comentários e docs em português.
 - Nunca versionar transcripts reais. Fixtures novos são sintéticos e levam a versão do
   Claude Code no nome.
 - A v1 é somente leitura: não escrever em `~/.claude` nem mexer no `settings.json` do usuário.
+- A arte é gerada por `scripts/gerar-arte.mjs` (`npm run arte`). A ordem dos quadros das
+  folhas de sprites é usada em `src/renderer/src/art.ts`: mude os dois juntos.

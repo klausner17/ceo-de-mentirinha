@@ -93,4 +93,17 @@ describe('OfficeStore', () => {
     store.flush(T0 + 31 * 60_000)
     expect(deltas.map((d) => d.kind)).toEqual(['upsert', 'remove'])
   })
+  it('registra o horário do último erro de ferramenta', () => {
+    const store = newStore()
+    store.ingestSession(SESSION, lines('session-2.1.318-tool-pending.jsonl'))
+    expect(store.snapshot(T0 + 10_000)[0]!.lastErrorAt).toBeNull()
+    store.ingestSession(SESSION, lines('session-2.1.318-tool-error.jsonl'))
+    expect(store.snapshot(T0 + 21_000)[0]).toMatchObject({ lastErrorAt: T0 + 20_000, currentTool: null })
+  })
+
+  it('usa 200 mil como limite de contexto e 1 milhão quando já passou disso', () => {
+    const store = newStore()
+    store.ingestSession(SESSION, lines('session-2.1.318-tool-pending.jsonl'))
+    expect(store.snapshot(T0 + 10_000)[0]!.contextLimit).toBe(200_000)
+  })
 })

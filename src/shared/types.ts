@@ -21,6 +21,8 @@ export interface SubagentState {
   model: string | null
   currentTool: ToolInUse | null
   lastActivity: number
+  /** Horário do último tool_result com erro. */
+  lastErrorAt: number | null
   /** true quando o subagente terminou (último turno sem tool call pendente). */
   finished: boolean
 }
@@ -38,12 +40,16 @@ export interface SessionState {
   title: string | null
   /** Tamanho do contexto no último turno: input + cache lido + cache criado. */
   contextTokens: number
+  /** Limite de contexto estimado para a pilha de papel (200 mil, ou 1 milhão se já passou disso). */
+  contextLimit: number
   /** Tokens de saída acumulados, deduplicados por message.id. */
   outputTokens: number
   /** Tokens lidos do cache acumulados (papel grampeado na gaveta). */
   cacheReadTokens: number
   currentTool: ToolInUse | null
   lastActivity: number
+  /** Horário do último tool_result com erro (papel amassado e fumaça). */
+  lastErrorAt: number | null
   status: DeskStatus
   /** true quando o registro em ~/.claude/sessions indica um processo vivo. */
   running: boolean
