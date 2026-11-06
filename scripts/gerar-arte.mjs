@@ -436,7 +436,9 @@ sheet('itens', 16, 16, [
 // Índices (começando em 0; no Tiled o gid é índice + 1):
 const T = {
   carpete: 0, carpeteB: 1, madeira: 2, paredeTopo: 3, parede: 4, porta: 5, janela: 6, tapete: 7,
-  planta: 8, cafeteira: 9, sofaE: 10, sofaD: 11, estante: 12, fichario: 13, quadro: 14, piso: 15
+  planta: 8, cafeteira: 9, sofaE: 10, sofaD: 11, estante: 12, fichario: 13, quadro: 14, piso: 15,
+  // Casa: parede lateral vista de cima e o batente de uma porta nela (o de baixo é o mesmo, espelhado).
+  paredeLado: 16, batente: 17
 }
 const tiles = []
 const fill = (ch) => Array.from({ length: 16 }, () => ch.repeat(16)).join('\n')
@@ -603,6 +605,11 @@ RRRRRRRRRRRRRRRR
 RRRRRRRRRRRRRRRR`
 tiles[T.piso] = Array.from({ length: 16 }, (_, y) => (y === 15 ? 'F'.repeat(16) : `F${'f'.repeat(15)}`)).join('\n')
 
+tiles[T.paredeLado] = Array.from({ length: 16 }, (_, y) => (y % 8 === 7 ? '...kPPPPPPPPk...' : '...kpPPPPPPPk...')).join('\n')
+tiles[T.batente] = Array.from({ length: 16 }, (_, y) =>
+  y < 3 ? '...kpPPPPPPPk...' : y === 3 ? '...kkkkkkkkkk...' : y % 4 === 3 ? '...MMMMMMMMMM...' : '...MmmmmmmmmM...'
+).join('\n')
+
 const tilesetCols = 8
 sheet('tiles', 16, 16, tiles.map((t) => t.trim()), {
   k: '#1d1f27', c: '#3c4a63', C: '#4a5a78', m: '#9c6b3f', M: '#7a5232', P: '#4b5163', p: '#6c7489', R: '#3a3f4d',
@@ -613,30 +620,46 @@ sheet('tiles', 16, 16, tiles.map((t) => t.trim()), {
 
 // ---------------------------------------------------------------- Mapa do Tiled
 
-// O hall de entrada: parede com janelas, porta por onde os liderados entram,
-// estante de skills, fichário de memória, cantinho do café e sala do CEO.
+// O hall de entrada da casa: parede com janelas, porta da rua por onde os liderados
+// entram, estante de skills, fichário de memória, cantinho do café e a Sala do CEO,
+// ligada ao hall por uma porta. No meio da borda de baixo começa o corredor central,
+// que desce pela casa; os cômodos (alas) ficam dos dois lados dele.
 const W = 40
 const H = 6
-const gid = (i) => (i === null ? 0 : i + 1)
+/** Corredor central: colunas CORREDOR..CORREDOR+CORREDOR_W-1. */
+const CORREDOR = 18
+const CORREDOR_W = 4
+/** Parede entre o hall e a Sala do CEO, com a porta nas linhas 3 e 4. */
+const PAREDE_CEO = 30
+const FLIP_Y = 0x40000000
+const gid = (i, flags = 0) => (i === null ? 0 : (i + 1) | flags)
 const ground = []
 const furniture = []
 for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
     let g = null
     let f = null
+    const ceo = x >= PAREDE_CEO
+    const corredor = x >= CORREDOR && x < CORREDOR + CORREDOR_W
     if (y === 0) g = T.paredeTopo
-    else if (y === 1) g = x === 4 ? T.porta : x % 6 === 2 && x < 30 ? T.janela : x === 20 ? T.quadro : x === 37 ? T.janela : T.parede
-    else g = x >= 30 ? (x === 30 ? T.paredeTopo : T.madeira) : y === H - 1 ? T.piso : (x + y) % 2 ? T.carpete : T.carpeteB
+    else if (y === 1) g = x === 4 ? T.porta : x % 6 === 2 && x < PAREDE_CEO ? T.janela : x === 20 ? T.quadro : x === 37 ? T.janela : T.parede
+    else if (ceo) g = T.madeira
+    else if (corredor && y >= 4) g = T.piso
+    else g = (x + y) % 2 ? T.carpete : T.carpeteB
+    if (y >= 2) {
+      // Paredes laterais da casa e a da Sala do CEO, com a porta.
+      if (x === 0 || x === W - 1) f = T.paredeLado
+      if (x === PAREDE_CEO) f = y === 3 ? T.batente : y === 4 ? null : T.paredeLado
+    }
     if (y === 2 && x === 9) f = T.estante
     if (y === 2 && x === 10) f = T.fichario
-    if (y === 2 && (x === 14 || x === 26)) f = T.planta
-    if (y === 2 && x === 16) f = T.cafeteira
-    if (y === 3 && x === 17) f = T.sofaE
-    if (y === 3 && x === 18) f = T.sofaD
+    if (y === 2 && (x === 14 || x === 27)) f = T.planta
+    if (y === 2 && x === 24) f = T.cafeteira
+    if (y === 3 && x === 25) f = T.sofaE
+    if (y === 3 && x === 26) f = T.sofaD
     if (y === 4 && x === 35) f = T.tapete
-    if (x === 30 && y > 1) g = T.parede
     ground.push(gid(g))
-    furniture.push(gid(f))
+    furniture.push(x === PAREDE_CEO && y === 4 ? gid(T.batente, FLIP_Y) : gid(f))
   }
 }
 
@@ -652,7 +675,7 @@ const map = {
   tileheight: 16,
   infinite: false,
   nextlayerid: 4,
-  nextobjectid: 5,
+  nextobjectid: 7,
   layers: [
     { id: 1, name: 'chao', type: 'tilelayer', x: 0, y: 0, width: W, height: H, opacity: 1, visible: true, data: ground },
     { id: 2, name: 'moveis', type: 'tilelayer', x: 0, y: 0, width: W, height: H, opacity: 1, visible: true, data: furniture },
@@ -667,9 +690,11 @@ const map = {
       y: 0,
       objects: [
         { id: 1, name: 'porta', type: 'ponto', point: true, x: 4 * 16 + 8, y: 2 * 16 + 8, width: 0, height: 0, rotation: 0, visible: true },
-        { id: 2, name: 'cafe', type: 'ponto', point: true, x: 16 * 16 + 8, y: 3 * 16 + 8, width: 0, height: 0, rotation: 0, visible: true },
+        { id: 2, name: 'cafe', type: 'ponto', point: true, x: 24 * 16 + 8, y: 3 * 16 + 8, width: 0, height: 0, rotation: 0, visible: true },
         { id: 3, name: 'sala-do-ceo', type: 'ponto', point: true, x: 35 * 16 + 8, y: 3 * 16 + 8, width: 0, height: 0, rotation: 0, visible: true },
-        { id: 4, name: 'placa-sala-do-ceo', type: 'texto', point: true, x: 31 * 16 + 4, y: 1 * 16 + 4, width: 0, height: 0, rotation: 0, visible: true }
+        { id: 4, name: 'placa-sala-do-ceo', type: 'texto', point: true, x: 31 * 16 + 4, y: 1 * 16 + 4, width: 0, height: 0, rotation: 0, visible: true },
+        // A faixa do corredor central: a cena continua o corredor para baixo e põe os cômodos dos lados.
+        { id: 6, name: 'corredor', type: 'area', x: CORREDOR * 16, y: 4 * 16, width: CORREDOR_W * 16, height: 2 * 16, rotation: 0, visible: true }
       ]
     }
   ],

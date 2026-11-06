@@ -4,6 +4,7 @@ import Phaser from 'phaser'
 import type { SessionState, SubagentState } from '@shared/types'
 import { seniorityFor } from '@shared/seniority'
 import { animKey, ITEM, personKey, SCALE, SCREEN, type Pose, type Screen } from '../art'
+import type { Point } from '../house'
 import { describeTool } from '../tools'
 
 export const DESK_W = 224
@@ -67,7 +68,8 @@ export class Desk {
     private readonly scene: Phaser.Scene,
     x: number,
     y: number,
-    private readonly door: { x: number; y: number }
+    /** Caminho da porta da rua até dentro do cômodo: hall, corredor e porta da ala. */
+    private route: Point[]
   ) {
     const s = <T extends Phaser.GameObjects.Sprite | Phaser.GameObjects.Image>(o: T): T => o.setScale(SCALE) as T
     const cx = DESK_W / 2
@@ -100,6 +102,10 @@ export class Desk {
     scene.tweens.add({ targets: this.zzz, y: 34, alpha: 0.2, duration: 1400, yoyo: true, repeat: -1 })
     scene.tweens.add({ targets: this.sweat, y: 64, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeIn' })
     scene.tweens.add({ targets: this.postits, y: 92, duration: 500, yoyo: true, repeat: -1 })
+  }
+
+  setRoute(route: Point[]): void {
+    this.route = route
   }
 
   moveTo(x: number, y: number): void {
@@ -217,7 +223,7 @@ export class Desk {
     return { x: x + 20 + col * 34, y: y + 70 + row * 34 }
   }
 
-  /** Fase 5: liderados entram pela porta, ficam perto do chefe e saem ao terminar. */
+  /** Fase 5: liderados entram pela porta da rua, atravessam a casa até o chefe e saem ao terminar. */
   private updateTeam(subagents: SubagentState[]): void {
     const alive = new Set(subagents.map((a) => a.id))
     for (const [id, sub] of this.team) {
@@ -234,14 +240,15 @@ export class Desk {
         while (used.has(slot)) slot++
         used.add(slot)
         const seniority = seniorityFor(a.model)
-        const sprite = this.scene.add.sprite(this.door.x, this.door.y, personKey(seniority), 8).setScale(SCALE).setOrigin(0.5, 1).setDepth(20)
+        const start = this.route[0] ?? { x: 0, y: 0 }
+        const sprite = this.scene.add.sprite(start.x, start.y, personKey(seniority), 8).setScale(SCALE).setOrigin(0.5, 1).setDepth(20)
         const label = this.scene.add
-          .text(this.door.x, this.door.y, (a.agentType ?? 'agente').split(/[-_ ]/)[0]!.slice(0, 9), { fontFamily: FONT, fontSize: '9px', color: '#e8e6e3', backgroundColor: '#1d1f27aa', padding: { x: 2, y: 1 } })
+          .text(start.x, start.y, (a.agentType ?? 'agente').split(/[-_ ]/)[0]!.slice(0, 9), { fontFamily: FONT, fontSize: '9px', color: '#e8e6e3', backgroundColor: '#1d1f27aa', padding: { x: 2, y: 1 } })
           .setOrigin(0.5, 0)
           .setDepth(21)
         sub = { sprite, label, seniority, arrived: false, slot }
         this.team.set(a.id, sub)
-        this.walk(sub, this.slot(slot), () => {
+        this.walkPath(sub, [...this.route.slice(1), this.slot(slot)], () => {
           sub!.arrived = true
         })
       }
@@ -272,9 +279,19 @@ export class Desk {
     this.scene.tweens.add({ targets: sub.label, x: to.x, y: to.y + 1, duration })
   }
 
+  /** Anda ponto a ponto, para passar pelas portas em vez de atravessar paredes. */
+  private walkPath(sub: Subordinate, points: Point[], done?: () => void): void {
+    const [next, ...rest] = points
+    if (!next) {
+      done?.()
+      return
+    }
+    this.walk(sub, next, rest.length ? () => this.walkPath(sub, rest, done) : done)
+  }
+
   private leaveThroughDoor(sub: Subordinate): void {
     sub.arrived = false
-    this.walk(sub, this.door, () => {
+    this.walkPath(sub, [...this.route].reverse(), () => {
       this.scene.tweens.add({
         targets: [sub.sprite, sub.label],
         alpha: 0,
