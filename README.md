@@ -56,7 +56,10 @@ Variáveis de ambiente:
 | Dormindo com Z | sem escrita há `CEO_IDLE_MINUTES` |
 | Liderados | subagentes: entram pela porta da rua, atravessam o hall e o corredor, entram pela porta da ala, ficam ao lado do chefe e fazem o caminho de volta ao terminar |
 | Office boys na portaria | chamadas a conectores MCP: cada chamada sai da mesa e entra na fila do servidor na portaria. Volta com envelope se deu certo, ou de mãos vazias e perdido se falhou |
-| Log no rodapé | quem chegou, quem saiu e mudanças de ferramenta |
+| Plaquinhas coloridas acima do nome | entregas da sessão e dos ajudantes: PR (verde), commits (azul) e artefatos (lilás: arquivos criados e páginas publicadas) |
+| Confete e "PR #12 aberto!" | a sessão acabou de abrir um PR; commit e artefato novo também sobem um aviso menor |
+| Quadro de entregas no hall | totais de PRs, artefatos e commits da casa; clicar lista tudo, com links |
+| Log no rodapé | quem chegou, quem saiu, mudanças de ferramenta e PRs abertos |
 
 Role com a roda do mouse ou arraste para andar pelo escritório.
 
@@ -95,6 +98,7 @@ assets/        pixel art e mapa do Tiled (gerados por scripts/gerar-arte.mjs)
 | 5. Subagentes | Feita: liderados entram e saem pela porta. Falta validar com arquivos reais de subagente no Mac. |
 | 6. Arte e polimento | Feita com pixel art original gerada por script (MIT) e hall no formato do Tiled. |
 | Depois da v1: office boys de MCP | Feita, lendo só os transcripts ([demo](docs/office-boys-demo.png)). |
+| Depois da v1: entregas (PRs e artefatos) | Feita, lendo só os transcripts ([quadro](docs/quadro-de-entregas.png)). Falta ver no Mac um `pr-link` de verdade. |
 
 ## Privacidade
 

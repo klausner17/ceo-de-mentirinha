@@ -67,3 +67,21 @@ precisa da pessoa, com `waitingFor` dizendo o quê (`permission prompt`, `input 
 Sem o registro (versões antigas), um pedido de permissão parece só uma ferramenta lenta e não
 vira email. Ainda falta confirmar no Mac que o `status` muda para `waiting` nos pedidos de
 permissão.
+
+## Entregas: PRs, commits e artefatos (2.1.321)
+
+O jogo mostra o que cada sessão entregou (`src/main/deliverables.ts`), só com o que já está
+no transcript. O parser passa para frente poucos campos do `input` de cada ferramenta
+(`command`, `file_path`/`notebook_path`, `title`, `message`/`commit_message`, `action`), o
+começo do texto de cada `tool_result` (até 8 mil caracteres) e o `toolUseResult.type` do Write.
+
+| Entrega | Sinal |
+| --- | --- |
+| PR | linha `pr-link` (`prNumber`, `prUrl`, `prRepository`), gravada pelo Claude Code depois de um `gh pr create`; o link `github.com/<dono>/<repo>/pull/<n>` no resultado do `gh pr create` ou de uma ferramenta MCP `create_pull_request` |
+| Commit | `[branch 1a2b3c4] Mensagem` na saída de um Bash com `git commit`; ferramentas MCP `push_files`/`create_or_update_file` |
+| Arquivo criado | Write com `toolUseResult.type: "create"` |
+| Arquivo editado | Write com `type: "update"`, Edit, MultiEdit, NotebookEdit |
+| Publicado | link `claude.ai/artifact/…` no resultado da ferramenta `Artifact` (menos `read`, `list`…) ou do Claude Docs |
+
+Ferramentas que voltaram com erro não contam. Arquivos mudados por comandos no Bash (sed,
+scripts) não aparecem: o transcript não diz quais arquivos foram.

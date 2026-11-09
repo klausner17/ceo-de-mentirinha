@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import type { OfficeDelta, SessionState } from '@shared/types'
-import { ago, deskLine, doing, roomKey, roomPeople, sessionDetails, sessionTitle } from './describe'
+import type { Deliverables } from '@shared/types'
+import { ago, cut, deskLine, deliverablesSummary, doing, newDeliveries, prLabel, roomKey, roomPeople, sessionDetails, sessionTitle, shortPath } from './describe'
+import { board, boardLines } from './entregas'
 import { emailKey, emailSubject, inbox, unreadCount } from './inbox'
 import { OfficeScene, type Selection } from './scenes/OfficeScene'
 
@@ -64,6 +66,81 @@ function refreshInbox(): void {
   document.title = unread > 0 ? `(${unread}) CEO de Mentirinha` : 'CEO de Mentirinha'
 }
 
+/** Atualiza o quadro de entregas do hall. */
+function refreshBoard(): void {
+  const b = board(known.values())
+  const { prs, artifacts, commits } = b.totals
+  scene.setBoard(boardLines(b), prs, prs + artifacts + commits === 0)
+}
+
+/** Link que abre no navegador (o processo principal manda para fora do app). */
+function link(href: string, text: string): HTMLAnchorElement {
+  const a = el('a', text)
+  a.href = href
+  a.target = '_blank'
+  a.rel = 'noreferrer'
+  return a
+}
+
+/** Um item de lista de entrega: texto (ou link) e uma linha pequena embaixo. */
+function item(main: HTMLElement | string, small: string, cls?: string): HTMLLIElement {
+  const li = el('li', undefined, cls)
+  li.append(typeof main === 'string' ? el('span', main) : main, el('small', small))
+  return li
+}
+
+const MAX_FILES_SHOWN = 8
+
+/** A seção "Entregas" do painel de uma mesa: PRs, publicados, commits e arquivos. */
+function deliverablesSection(d: Deliverables, cwd: string | null, now: number): HTMLElement[] {
+  const summary = deliverablesSummary(d)
+  if (!summary) return []
+  const out: HTMLElement[] = [el('h3', 'Entregas'), el('p', summary, 'sub')]
+  const list = (title: string, items: HTMLLIElement[]) => {
+    if (items.length === 0) return
+    const ul = el('ul', undefined, 'deliveries')
+    ul.append(...items)
+    out.push(el('h4', title), ul)
+  }
+  const newest = <T extends { at: number }>(xs: T[]) => [...xs].sort((a, b) => b.at - a.at)
+  list('Pull requests', newest(d.prs).map((p) => item(link(p.url, prLabel(p)), `aberto ${ago(p.at, now)}`, 'pr')))
+  list('Publicados', newest(d.links).map((l) => item(link(l.url, l.title ?? 'Artefato'), `publicado ${ago(l.at, now)}`, 'art')))
+  list('Commits', newest(d.commits).slice(0, 6).map((c) => item(cut(c.message, 80), `${c.sha ?? 'commit'} · ${ago(c.at, now)}`, 'commit')))
+  const files = newest(d.files)
+  list(
+    'Arquivos',
+    files.slice(0, MAX_FILES_SHOWN).map((f) => item(shortPath(f.path, cwd), `${f.created ? 'criado' : 'editado'} ${ago(f.at, now)}`, f.created ? 'art' : 'file'))
+  )
+  const hidden = d.filesTotal - Math.min(files.length, MAX_FILES_SHOWN)
+  if (hidden > 0) out.push(el('p', `e mais ${hidden} ${hidden === 1 ? 'arquivo' : 'arquivos'}`, 'sub'))
+  return out
+}
+
+/** O painel do quadro de entregas: o que a casa inteira entregou, com links. */
+function renderBoard(close: HTMLElement, now: number): void {
+  const b = board(known.values())
+  const body: HTMLElement[] = [close, el('h2', 'Quadro de entregas')]
+  const { prs, artifacts, commits } = b.totals
+  if (prs + artifacts + commits === 0) {
+    body.push(el('p', 'Ninguém entregou nada ainda. PRs, commits e artefatos aparecem aqui.', 'sub'))
+  } else {
+    body.push(el('p', boardLines(b).join(' · '), 'sub'))
+    const list = (title: string, items: HTMLLIElement[]) => {
+      if (items.length === 0) return
+      const ul = el('ul', undefined, 'deliveries')
+      ul.append(...items)
+      body.push(el('h4', title), ul)
+    }
+    const who = (from: string, at: number, verb: string) => `${from} · ${verb} ${ago(at, now)}`
+    list('Pull requests', b.prs.map(({ item: p, from }) => item(link(p.url, prLabel(p)), who(from, p.at, 'aberto'), 'pr')))
+    list('Publicados', b.links.map(({ item: l, from }) => item(link(l.url, l.title ?? 'Artefato'), who(from, l.at, 'publicado'), 'art')))
+    list('Arquivos criados', b.created.slice(0, 12).map(({ item: f, from }) => item(shortPath(f.path, f.cwd), who(from, f.at, 'criado'), 'art')))
+    list('Commits', b.commits.slice(0, 10).map(({ item: c, from }) => item(cut(c.message, 80), `${from} · ${c.sha ? `${c.sha} · ` : ''}${ago(c.at, now)}`, 'commit')))
+  }
+  detailsEl.replaceChildren(...body)
+  detailsEl.hidden = false
+}
+
 function select(sel: Selection | null): void {
   selected = sel
   if (sel?.kind === 'session') markRead(sel.id)
@@ -90,7 +167,7 @@ function renderDetails(): void {
         const mono = row.label === 'Sessão' || row.label === 'Pasta'
         dl.append(el('dt', row.label), el('dd', row.value, mono ? 'mono' : undefined))
       }
-      detailsEl.replaceChildren(close, el('h2', sessionTitle(s)), el('p', `Ala ${s.project}`, 'sub'), dl)
+      detailsEl.replaceChildren(close, el('h2', sessionTitle(s)), el('p', `Ala ${s.project}`, 'sub'), dl, ...deliverablesSection(s.deliverables, s.cwd, now))
       detailsEl.hidden = false
       return
     }
@@ -124,6 +201,11 @@ function renderDetails(): void {
     }
     detailsEl.replaceChildren(...body)
     detailsEl.hidden = false
+    return
+  }
+
+  if (selected?.kind === 'entregas') {
+    renderBoard(close, now)
     return
   }
 
@@ -167,6 +249,7 @@ function apply(delta: OfficeDelta): void {
       for (const s of delta.sessions) known.set(s.id, s)
       scene.setSessions(delta.sessions)
       refreshInbox()
+      refreshBoard()
       renderDetails()
       log('info', `${delta.sessions.length} sessão(ões) no escritório`)
       break
@@ -182,7 +265,12 @@ function apply(delta: OfficeDelta): void {
         if (selected?.kind === 'session' && selected.id === s.id) read.add(emailKey(s.id, a))
         else log(a.reason === 'relatorio' ? 'info' : 'warn', `Email de ${sessionTitle(s)}: ${emailSubject(s, a)}`)
       }
+      // Entregas novas viram linha no log (a mesa comemora sozinha).
+      const fresh = newDeliveries(before?.deliverables ?? null, s.deliverables)
+      for (const p of fresh.prs) log('info', `${sessionTitle(s)} abriu ${prLabel(p)}`)
+      if (fresh.artifacts > 0) log('info', `${sessionTitle(s)} entregou ${fresh.artifacts === 1 ? 'um artefato novo' : `${fresh.artifacts} artefatos novos`}`)
       refreshInbox()
+      refreshBoard()
       if (selected) renderDetails()
       if (!before) log('info', `Chegou: ${describe(delta.session)}`)
       else if (before.currentTool?.id !== delta.session.currentTool?.id || before.status !== delta.session.status)
@@ -194,6 +282,7 @@ function apply(delta: OfficeDelta): void {
       known.delete(delta.id)
       scene.remove(delta.id)
       refreshInbox()
+      refreshBoard()
       renderDetails()
       log('info', `Foi embora: ${gone ? sessionTitle(gone) : delta.id.slice(0, 8)}`)
       break

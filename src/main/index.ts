@@ -1,7 +1,7 @@
 // Processo principal do Electron: lê os arquivos e conversa com o renderer por IPC.
 
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC, type OfficeDelta } from '@shared/types'
 import { demoSessions } from './demo'
 import { OfficeStore } from './office-store'
@@ -36,6 +36,14 @@ function createWindow(): void {
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  // Links de PR e de artefato abrem no navegador, nunca dentro do app.
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\//.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  window.webContents.on('will-navigate', (e, url) => {
+    if (url !== window?.webContents.getURL()) e.preventDefault()
+  })
   window.on('closed', () => (window = null))
 }
 

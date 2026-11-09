@@ -1,7 +1,7 @@
 // Frases em português para a plaquinha da mesa e para o painel de detalhes.
 // Funções puras: recebem o estado e o horário, devolvem texto. Testadas em tests/describe.test.ts.
 
-import type { SessionState } from '@shared/types'
+import type { Deliverables, PullRequest, SessionState } from '@shared/types'
 import { describeTool } from './tools'
 
 const MIN = 60_000
@@ -123,4 +123,69 @@ export function sessionDetails(s: SessionState, now: number): DetailRow[] {
   add('Pasta', s.cwd)
   add('Sessão', s.id)
   return rows
+}
+
+/** Quantos artefatos a sessão produziu: arquivos que criou e páginas/docs publicados. */
+export function artifactCount(d: Deliverables): number {
+  return d.filesCreated + d.links.length
+}
+
+export interface Chip {
+  text: string
+  /** Cor de fundo (texto escuro por cima). */
+  color: string
+}
+
+/** Cores das plaquinhas de entrega: PR verde (como no GitHub), commit azul, artefato lilás. */
+export const CHIP_COLORS = { pr: '#3fb950', commit: '#79c0ff', artefato: '#d2a8ff' } as const
+
+/** As plaquinhas de entrega na mesa: só o que existe, do mais importante para o menos. */
+export function deliverableChips(d: Deliverables): Chip[] {
+  const chips: Chip[] = []
+  const last = d.prs[d.prs.length - 1]
+  if (last) chips.push({ text: d.prs.length === 1 ? `PR #${last.number}` : `${d.prs.length} PRs`, color: CHIP_COLORS.pr })
+  if (d.commits.length > 0) chips.push({ text: plural(d.commits.length, 'commit', 'commits'), color: CHIP_COLORS.commit })
+  const arts = artifactCount(d)
+  if (arts > 0) chips.push({ text: plural(arts, 'artefato', 'artefatos'), color: CHIP_COLORS.artefato })
+  return chips
+}
+
+/** Resumo em uma linha: "2 PRs · 3 commits · 5 arquivos (2 novos) · 1 publicado". */
+export function deliverablesSummary(d: Deliverables): string | null {
+  const parts: string[] = []
+  if (d.prs.length > 0) parts.push(plural(d.prs.length, 'PR', 'PRs'))
+  if (d.commits.length > 0) parts.push(plural(d.commits.length, 'commit', 'commits'))
+  if (d.filesTotal > 0) {
+    const novos = d.filesCreated > 0 ? ` (${d.filesCreated} ${d.filesCreated === 1 ? 'novo' : 'novos'})` : ''
+    parts.push(`${plural(d.filesTotal, 'arquivo', 'arquivos')}${novos}`)
+  }
+  if (d.links.length > 0) parts.push(plural(d.links.length, 'publicado', 'publicados'))
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+/** "ceo/loja#42 · Checkout em etapas". */
+export function prLabel(pr: PullRequest): string {
+  const where = pr.repository ? `${pr.repository.split('/').pop()}#${pr.number}` : `PR #${pr.number}`
+  return pr.title ? `${where} · ${pr.title}` : where
+}
+
+/** "/Users/ceo/code/loja/src/a.ts" → "src/a.ts" (relativo à pasta da sessão quando dá). */
+export function shortPath(path: string, cwd: string | null): string {
+  if (cwd && path.startsWith(`${cwd}/`)) return path.slice(cwd.length + 1)
+  const parts = path.split('/')
+  return parts.length > 3 ? `…/${parts.slice(-2).join('/')}` : path
+}
+
+/**
+ * O que mudou nas entregas desde o último estado, para a festa na mesa. Na primeira vez
+ * (`before` null, ao abrir o app) não comemora nada que já existia.
+ */
+export function newDeliveries(before: Deliverables | null, now: Deliverables): { prs: PullRequest[]; commits: number; artifacts: number } {
+  if (!before) return { prs: [], commits: 0, artifacts: 0 }
+  const known = new Set(before.prs.map((p) => p.url))
+  return {
+    prs: now.prs.filter((p) => !known.has(p.url)),
+    commits: Math.max(0, now.commits.length - before.commits.length),
+    artifacts: Math.max(0, artifactCount(now) - artifactCount(before))
+  }
 }

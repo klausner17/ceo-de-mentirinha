@@ -46,6 +46,53 @@ export interface Awaiting {
   detail: string | null
 }
 
+/** Um pull request que a sessão abriu (por `gh pr create`, por MCP ou pela linha `pr-link`). */
+export interface PullRequest {
+  number: number
+  url: string
+  /** "dono/repo", quando dá para saber. */
+  repository: string | null
+  title: string | null
+  at: number
+}
+
+/** Um commit feito pela sessão (saída do `git commit` ou commit por MCP). */
+export interface Commit {
+  /** Hash curto, quando a saída do git mostra. */
+  sha: string | null
+  message: string
+  at: number
+}
+
+/** Um arquivo que a sessão criou ou alterou com Write/Edit. */
+export interface FileChange {
+  path: string
+  /** true quando a sessão criou o arquivo (e não só editou). */
+  created: boolean
+  at: number
+}
+
+/** Um artefato publicado (página, doc) com link para abrir. */
+export interface PublishedLink {
+  url: string
+  /** Título do artefato, quando a chamada dizia. */
+  title: string | null
+  at: number
+}
+
+/** Tudo o que a sessão (e seus ajudantes) já entregou. As listas vêm da mais antiga para a mais nova. */
+export interface Deliverables {
+  prs: PullRequest[]
+  commits: Commit[]
+  /** Os arquivos mexidos mais recentes (a lista é cortada; ver `filesTotal`). */
+  files: FileChange[]
+  /** Quantos arquivos diferentes foram mexidos ao todo. */
+  filesTotal: number
+  /** Quantos desses arquivos foram criados pela sessão. */
+  filesCreated: number
+  links: PublishedLink[]
+}
+
 export interface SubagentState {
   id: string
   /** Tipo do agente, lido do agent-<id>.meta.json quando existe. */
@@ -99,6 +146,8 @@ export interface SessionState {
   /** Esperando uma resposta do CEO, ou null se não precisa dele agora. */
   awaiting: Awaiting | null
   subagents: SubagentState[]
+  /** PRs, commits, arquivos e artefatos que a sessão produziu. */
+  deliverables: Deliverables
 }
 
 /** Mensagens do processo principal para o renderer. */

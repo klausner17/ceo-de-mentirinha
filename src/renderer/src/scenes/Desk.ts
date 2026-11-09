@@ -1,12 +1,12 @@
 // Uma mesa: funcionário, monitor, pilha de papel, balão da ferramenta e os liderados.
 
 import Phaser from 'phaser'
-import type { SessionState, SubagentState } from '@shared/types'
+import type { Deliverables, SessionState, SubagentState } from '@shared/types'
 import { seniorityFor } from '@shared/seniority'
 import { animKey, ITEM, personKey, SCALE, SCREEN, type Pose, type Screen } from '../art'
 import type { Point } from '../house'
 import type { NavGrid } from '../nav'
-import { deskLine, sessionTitle } from '../describe'
+import { CHIP_COLORS, deliverableChips, deskLine, newDeliveries, sessionTitle } from '../describe'
 import { describeTool } from '../tools'
 import { walkPath, pathTo } from './walker'
 
@@ -55,6 +55,10 @@ export class Desk {
   private readonly papers: Phaser.GameObjects.Container
   private readonly postits: Phaser.GameObjects.Container
   private readonly team = new Map<string, Subordinate>()
+  /** Plaquinhas de entrega (PR, commits, artefatos) em cima da placa com o nome. */
+  private readonly chips: Phaser.GameObjects.Container
+  private chipsKey = ''
+  private delivered: Deliverables | null = null
 
   private seniority: ReturnType<typeof seniorityFor> = 'desconhecido'
   private pose: Pose | null = null
@@ -96,9 +100,10 @@ export class Desk {
     const plate = (this.plate = scene.add.rectangle(6, 124, DESK_W - 12, 44, 0x1d1f27, 0.72).setOrigin(0))
     this.title = scene.add.text(14, 128, '', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: '#e8e6e3' })
     this.subtitle = scene.add.text(14, 147, '', { fontFamily: FONT, fontSize: '11px', color: '#9aa1b2' })
+    this.chips = scene.add.container(DESK_W - 8, 122)
 
     this.root = scene.add.container(x, y, [
-      chair, this.person, desk, this.monitor, this.papers, this.postits, this.coffee, this.zzz, this.sweat, plate, this.title, this.subtitle, this.balloon
+      chair, this.person, desk, this.monitor, this.papers, this.postits, this.coffee, this.zzz, this.sweat, plate, this.title, this.subtitle, this.chips, this.balloon
     ])
     // Área clicável: a mesa inteira. Um arrasto (para mover a câmera) não conta como clique.
     const hit = scene.add.zone(0, 0, DESK_W, DESK_H).setOrigin(0).setInteractive({ useHandCursor: true })
@@ -162,6 +167,7 @@ export class Desk {
     fit(this.title, sessionTitle(s), DESK_W - 28)
     fit(this.subtitle, deskLine(s, Date.now()), DESK_W - 28)
 
+    this.updateDeliverables(s.deliverables)
     this.updatePapers(s.contextTokens, s.contextLimit)
     this.maybeCrumple(s.lastErrorAt)
     this.updateTeam(s.subagents)
@@ -190,6 +196,62 @@ export class Desk {
     this.pose = pose
     this.person.setTexture(personKey(this.seniority))
     this.person.play(animKey(this.seniority, pose))
+  }
+
+  /** Plaquinhas de entrega e, quando chega algo novo, a comemoração. */
+  private updateDeliverables(d: Deliverables): void {
+    const chips = deliverableChips(d)
+    const key = chips.map((c) => c.text).join('|')
+    if (key !== this.chipsKey) {
+      this.chipsKey = key
+      this.chips.removeAll(true)
+      // Da direita para a esquerda, alinhadas com a borda da placa.
+      let right = 0
+      for (const c of [...chips].reverse()) {
+        const t = this.scene.add
+          .text(right, 0, c.text, { fontFamily: FONT, fontSize: '10px', fontStyle: 'bold', color: '#1d1f27', backgroundColor: c.color, padding: { x: 4, y: 1 } })
+          .setOrigin(1, 1)
+        this.chips.add(t)
+        right -= t.width + 4
+      }
+    }
+    const fresh = newDeliveries(this.delivered, d)
+    this.delivered = d
+    const last = fresh.prs[fresh.prs.length - 1]
+    if (last) this.celebrate(fresh.prs.length === 1 ? `PR #${last.number} aberto!` : `${fresh.prs.length} PRs abertos!`, CHIP_COLORS.pr, true)
+    else if (fresh.artifacts > 0) this.celebrate(fresh.artifacts === 1 ? 'Novo artefato!' : `${fresh.artifacts} artefatos novos!`, CHIP_COLORS.artefato, false)
+    else if (fresh.commits > 0) this.celebrate('Commit!', CHIP_COLORS.commit, false)
+  }
+
+  /** Texto subindo da mesa; num PR novo, também confete. */
+  private celebrate(text: string, color: string, confetti: boolean): void {
+    const { x, y } = this.root
+    const cx = x + DESK_W / 2
+    const label = this.scene.add
+      .text(cx, y + 60, text, { fontFamily: FONT, fontSize: confetti ? '15px' : '12px', fontStyle: 'bold', color: '#1d1f27', backgroundColor: color, padding: { x: 6, y: 3 } })
+      .setOrigin(0.5)
+      .setDepth(30)
+      .setScale(0.4)
+    this.scene.tweens.add({ targets: label, scale: 1, duration: 300, ease: 'Back.easeOut' })
+    this.scene.tweens.add({ targets: label, y: y - 10, duration: 2400, ease: 'Sine.easeOut' })
+    this.scene.tweens.add({ targets: label, alpha: 0, delay: 2000, duration: 600, onComplete: () => label.destroy() })
+    if (!confetti) return
+    const colors = [0x3fb950, 0xe8c35b, 0x79c0ff, 0xd2a8ff, 0xff7b72]
+    for (let i = 0; i < 24; i++) {
+      const bit = this.scene.add.rectangle(cx, y + 60, 5, 8, colors[i % colors.length]).setDepth(29).setAngle(Math.random() * 360)
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2
+      const dist = 60 + Math.random() * 70
+      this.scene.tweens.add({
+        targets: bit,
+        x: cx + Math.cos(angle) * dist,
+        y: y + 60 + Math.sin(angle) * dist,
+        angle: bit.angle + 360,
+        duration: 700,
+        ease: 'Cubic.easeOut',
+        onComplete: () =>
+          this.scene.tweens.add({ targets: bit, y: bit.y + 60, alpha: 0, duration: 900, ease: 'Sine.easeIn', onComplete: () => bit.destroy() })
+      })
+    }
   }
 
   /** Pilha de papel: uma folha a cada 20 mil tokens; folhas novas caem na pilha. */
