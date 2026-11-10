@@ -21,18 +21,50 @@ interface BaseEvent {
   isSidechain: boolean
 }
 
+/**
+ * Os poucos campos do `input` de uma ferramenta que o jogo usa para achar entregas
+ * (PR, commit, arquivo, artefato). Os demais campos são ignorados.
+ */
+export interface ToolInput {
+  /** Bash: o comando. */
+  command: string | null
+  /** Write/Edit/MultiEdit (`file_path`) e NotebookEdit (`notebook_path`). */
+  filePath: string | null
+  /** Título do PR (MCP) ou do artefato. */
+  title: string | null
+  /** Mensagem de commit em ferramentas MCP (`message`, `commit_message`). */
+  message: string | null
+  /** Ação de ferramentas com vários modos, como a de artefatos (`publish`, `read`…). */
+  action: string | null
+}
+
+export interface ToolUse {
+  id: string
+  name: string
+  input: ToolInput
+}
+
 export interface AssistantEvent extends BaseEvent {
   kind: 'assistant'
   messageId: string | null
   model: string | null
   usage: Usage | null
-  toolUses: { id: string; name: string }[]
+  toolUses: ToolUse[]
   stopReason: string | null
+}
+
+export interface ToolResult {
+  toolUseId: string
+  isError: boolean
+  /** Começo do texto do resultado (para achar links de PR e o hash do commit). */
+  text: string | null
+  /** Write: `create` quando o arquivo foi criado, `update` quando já existia. */
+  fileOp: 'create' | 'update' | null
 }
 
 export interface UserEvent extends BaseEvent {
   kind: 'user'
-  toolResults: { toolUseId: string; isError: boolean }[]
+  toolResults: ToolResult[]
   /** Texto digitado pela pessoa (null em resultados de ferramenta, comandos e linhas internas). */
   prompt: string | null
 }
@@ -52,12 +84,20 @@ export interface TitleEvent extends BaseEvent {
   source: TitleSource
 }
 
+/** Linha `pr-link`: o Claude Code ligou a sessão a um PR (gravada depois de `gh pr create`). */
+export interface PrLinkEvent extends BaseEvent {
+  kind: 'pr-link'
+  number: number
+  url: string
+  repository: string | null
+}
+
 export interface OtherEvent extends BaseEvent {
   kind: 'other'
   type: string | null
 }
 
-export type TranscriptEvent = AssistantEvent | UserEvent | TitleEvent | OtherEvent
+export type TranscriptEvent = AssistantEvent | UserEvent | TitleEvent | PrLinkEvent | OtherEvent
 
 type Json = Record<string, unknown>
 
@@ -106,6 +146,27 @@ function promptText(message: unknown): string | null {
   return clean
 }
 
+/** Tamanho máximo do texto de resultado guardado: links e hashes aparecem no começo. */
+const RESULT_TEXT_MAX = 8000
+
+function toolInput(v: unknown): ToolInput {
+  const i = isObj(v) ? v : {}
+  return {
+    command: str(i.command),
+    filePath: str(i.file_path) ?? str(i.notebook_path),
+    title: str(i.title),
+    message: str(i.message) ?? str(i.commit_message),
+    action: str(i.action)
+  }
+}
+
+/** Texto de um tool_result: `content` em string ou blocos `text`. */
+function resultText(block: Json): string | null {
+  const c = block.content
+  const text = typeof c === 'string' ? c : Array.isArray(c) ? c.filter(isObj).map((b) => (b.type === 'text' ? (str(b.text) ?? '') : '')).join('\n') : ''
+  return text === '' ? null : text.slice(0, RESULT_TEXT_MAX)
+}
+
 /** Interpreta um objeto já decodificado. Retorna null se não for um objeto. */
 export function parseRecord(raw: unknown): TranscriptEvent | null {
   if (!isObj(raw)) return null
@@ -122,7 +183,7 @@ export function parseRecord(raw: unknown): TranscriptEvent | null {
     const message = isObj(raw.message) ? raw.message : {}
     const toolUses = contentBlocks(message)
       .filter((b) => b.type === 'tool_use')
-      .map((b) => ({ id: str(b.id) ?? '', name: str(b.name) ?? 'desconhecida' }))
+      .map((b) => ({ id: str(b.id) ?? '', name: str(b.name) ?? 'desconhecida', input: toolInput(b.input) }))
       .filter((t) => t.id !== '')
     return {
       ...base,
@@ -136,12 +197,26 @@ export function parseRecord(raw: unknown): TranscriptEvent | null {
   }
 
   if (type === 'user') {
-    const toolResults = contentBlocks(raw.message)
-      .filter((b) => b.type === 'tool_result')
-      .map((b) => ({ toolUseId: str(b.tool_use_id) ?? '', isError: b.is_error === true }))
+    // `toolUseResult` descreve o resultado da (única) ferramenta da linha; no Write, `type` diz se criou o arquivo.
+    const tur = isObj(raw.toolUseResult) ? raw.toolUseResult : null
+    const op = tur && (tur.type === 'create' || tur.type === 'update') ? tur.type : null
+    const blocks = contentBlocks(raw.message).filter((b) => b.type === 'tool_result')
+    const toolResults = blocks
+      .map((b) => ({
+        toolUseId: str(b.tool_use_id) ?? '',
+        isError: b.is_error === true,
+        text: resultText(b),
+        fileOp: blocks.length === 1 ? (op as ToolResult['fileOp']) : null
+      }))
       .filter((t) => t.toolUseId !== '')
     const prompt = toolResults.length === 0 && raw.isMeta !== true ? promptText(raw.message) : null
     return { ...base, kind: 'user', toolResults, prompt }
+  }
+
+  if (type === 'pr-link') {
+    const url = str(raw.prUrl)
+    const n = typeof raw.prNumber === 'number' ? raw.prNumber : Number(raw.prNumber)
+    if (url && Number.isInteger(n) && n > 0) return { ...base, kind: 'pr-link', number: n, url, repository: str(raw.prRepository) }
   }
 
   const titleField: Record<string, [string, TitleSource]> = {

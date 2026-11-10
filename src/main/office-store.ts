@@ -3,6 +3,7 @@
 
 import type { Awaiting, OfficeDelta, SessionState, SubagentState } from '@shared/types'
 import { AgentTracker, seniorityFor } from './agent-tracker'
+import { mergeDeliverables } from './deliverables'
 import { parseLine, type TranscriptEvent } from './parser'
 import { projectName } from './paths'
 
@@ -271,7 +272,9 @@ export class OfficeStore {
       mcpResults: main.mcpResultsSince(now - this.opts.mcpResultMs),
       running,
       awaiting: awaitingFor(main, reg, subagents),
-      subagents
+      subagents,
+      // Ajudantes que já terminaram (e saíram da mesa) continuam contando.
+      deliverables: mergeDeliverables([main.deliverables, ...[...rec.subagents.values()].map((a) => a.tracker.deliverables)])
     }
   }
 

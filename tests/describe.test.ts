@@ -26,6 +26,7 @@ const session = (over: Partial<SessionState> = {}): SessionState => ({
   running: true,
   awaiting: null,
   subagents: [],
+  deliverables: { prs: [], commits: [], files: [], filesTotal: 0, filesCreated: 0, links: [] },
   ...over
 })
 

@@ -17,8 +17,13 @@ const WALL = TILE * WALL_TILES
 const DESKS_PER_ROW = 2
 const DESK_SIZE = { w: DESK_W, h: DESK_H, gap: GAP, pad: WING_PAD, perRow: DESKS_PER_ROW }
 
-/** O que foi clicado: uma mesa (sessão), a placa de um cômodo (projeto) ou o computador do CEO. */
-export type Selection = { kind: 'session'; id: string } | { kind: 'room'; key: string } | { kind: 'inbox' }
+/** O que foi clicado: uma mesa (sessão), a placa de um cômodo (projeto), o computador do CEO ou o quadro de entregas. */
+export type Selection = { kind: 'session'; id: string } | { kind: 'room'; key: string } | { kind: 'inbox' } | { kind: 'entregas' }
+
+/** Onde fica o quadro de entregas no hall (centro, em pixels do mundo), entre o fichário e a planta. */
+const BOARD_AT = { x: 404, y: 76 }
+const BOARD_W = 104
+const BOARD_H = 64
 
 /** A mesa, a cadeira e o funcionário sentado bloqueiam a passagem; a plaquinha com o nome não. */
 function deskObstacle(at: { x: number; y: number }): Rect {
@@ -38,6 +43,12 @@ export class OfficeScene extends Phaser.Scene {
   private ceoMonitor?: Phaser.GameObjects.Sprite
   private badge?: Phaser.GameObjects.Container
   private badgeText?: Phaser.GameObjects.Text
+  /** Quadro de entregas no hall: linhas com os totais. */
+  private boardText?: Phaser.GameObjects.Text
+  private boardRoot?: Phaser.GameObjects.Container
+  private boardState = { lines: ['Nada entregue ainda'], prs: 0, empty: true }
+  /** O primeiro estado (ao abrir o app) não faz o quadro balançar. */
+  private boardSeen = false
   /** Último pedido de setInbox, aplicado quando a cena fica pronta. */
   private inboxState = { unread: 0, total: 0 }
   private ready = false
@@ -106,6 +117,7 @@ export class OfficeScene extends Phaser.Scene {
       .setDepth(1)
     this.boys = new OfficeBoys(this, { x: portaria.x - 20, y: portaria.y + 16 })
     this.hallObstacles.push({ x: portaria.x - 32, y: portaria.y - 40, w: 64, h: 40 })
+    this.buildBoard()
     const plate = at('placa-sala-do-ceo')
     this.add.text(plate.x + 8, plate.y, 'Sala do CEO', { fontFamily: FONT, fontSize: '12px', fontStyle: 'bold', color: '#e8c35b' }).setDepth(1)
     // O CEO (você) na própria mesa.
@@ -137,6 +149,51 @@ export class OfficeScene extends Phaser.Scene {
       if (p.getDistance() < 6) this.onSelect({ kind: 'inbox' })
     })
     this.setInbox(this.inboxState.unread, this.inboxState.total)
+  }
+
+  /**
+   * Quadro de entregas: um quadro branco de pé no hall com os PRs, artefatos e commits de
+   * toda a casa. Clicar abre a lista com os links. Um PR novo faz o quadro balançar.
+   */
+  private buildBoard(): void {
+    const { x, y } = BOARD_AT
+    const left = -BOARD_W / 2
+    const legs = this.add.graphics()
+    legs.lineStyle(4, 0x6b4a2b)
+    legs.lineBetween(left + 14, 0, left + 8, BOARD_H / 2 + 22)
+    legs.lineBetween(-left - 14, 0, -left - 8, BOARD_H / 2 + 22)
+    const frame = this.add.rectangle(0, 0, BOARD_W, BOARD_H, 0x8b5a2b).setStrokeStyle(2, 0x4a3320)
+    const white = this.add.rectangle(0, 2, BOARD_W - 10, BOARD_H - 12, 0xf4f1e8)
+    const header = this.add
+      .text(0, -BOARD_H / 2 - 2, 'Entregas', { fontFamily: FONT, fontSize: '10px', fontStyle: 'bold', color: '#1d1f27', backgroundColor: '#3fb950', padding: { x: 4, y: 1 } })
+      .setOrigin(0.5, 0.5)
+    this.boardText = this.add
+      .text(left + 10, -BOARD_H / 2 + 10, '', { fontFamily: FONT, fontSize: '11px', fontStyle: 'bold', color: '#2a2d36', lineSpacing: 1 })
+      .setOrigin(0, 0)
+    this.boardRoot = this.add.container(x, y, [legs, frame, white, this.boardText, header]).setDepth(2)
+    this.hallObstacles.push({ x: x - BOARD_W / 2, y: y - BOARD_H / 2, w: BOARD_W, h: BOARD_H + 22 })
+    const hit = this.add.zone(x, y + 6, BOARD_W + 8, BOARD_H + 24).setInteractive({ useHandCursor: true }).setDepth(3)
+    hit.on('pointerover', () => frame.setStrokeStyle(2, 0xe8c35b))
+    hit.on('pointerout', () => frame.setStrokeStyle(2, 0x4a3320))
+    hit.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (p.getDistance() < 6) this.onSelect({ kind: 'entregas' })
+    })
+    this.paintBoard()
+  }
+
+  /** Atualiza o quadro de entregas. `prs` é o total de PRs: quando aumenta, o quadro balança. */
+  setBoard(lines: string[], prs: number, empty: boolean): void {
+    const grew = this.boardSeen && prs > this.boardState.prs
+    this.boardSeen = true
+    this.boardState = { lines, prs, empty }
+    this.paintBoard()
+    if (grew && this.boardRoot) this.tweens.add({ targets: this.boardRoot, angle: { from: -4, to: 4 }, duration: 120, yoyo: true, repeat: 3, onComplete: () => this.boardRoot?.setAngle(0) })
+  }
+
+  private paintBoard(): void {
+    if (!this.boardText) return
+    this.boardText.setText(this.boardState.lines.slice(0, 3).join('\n'))
+    this.boardText.setColor(this.boardState.empty ? '#8a8f9c' : '#2a2d36')
   }
 
   /** Atualiza o computador do CEO: `unread` emails não lidos de `total` na caixa. */
