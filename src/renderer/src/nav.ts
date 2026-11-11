@@ -1,6 +1,6 @@
 // Grade de caminhada da casa: diz onde dá para pisar (chão, corredor, portas) e onde não
 // dá (paredes e móveis), e acha caminhos com A*. Os office boys e os liderados andam por
-// ela em vez de atravessar paredes. Só faz contas: não depende do Phaser, para dar para testar.
+// ela em vez de atravessar paredes. Só faz contas: não depende do Three.js, para dar para testar.
 
 import type { HousePlan, Point } from './house'
 
@@ -244,7 +244,7 @@ class MinHeap {
 export interface NavInput {
   map: HallMap
   /** Índices do tileset (o gid do Tiled é índice + 1). */
-  tiles: { paredeTopo: number; parede: number; porta: number; janela: number; quadro: number; tapete: number; batente: number }
+  tiles: { paredeTopo: number; parede: number; porta: number; janela: number; quadro: number; tapete: number; batente: number; paredeLado: number }
   tile: number
   width: number
   hallHeight: number
@@ -257,26 +257,32 @@ export interface NavInput {
 export function buildNav({ map, tiles, tile, width, hallHeight, plan, obstacles }: NavInput): NavGrid {
   const nav = new NavGrid(width, Math.max(plan.height, hallHeight), tile / 2)
 
-  // Hall: parede no chão (topo, face, janelas, quadro, porta da rua) e qualquer móvel bloqueiam;
-  // tapete e batente (vão de porta) deixam passar.
-  const wallTiles = new Set([tiles.paredeTopo, tiles.parede, tiles.porta, tiles.janela, tiles.quadro].map((i) => i + 1))
+  // Hall: o topo da parede e qualquer móvel bloqueiam; tapete e batente (vão de porta)
+  // deixam passar. A face da parede (a linha com janelas, quadro e a porta da rua) é parede
+  // em pé no 3D, e o chão em frente a ela dá para pisar, menos onde uma parede lateral
+  // (a da casa ou a da Sala do CEO) encosta nela.
+  const top = tiles.paredeTopo + 1
+  const face = new Set([tiles.parede, tiles.porta, tiles.janela, tiles.quadro].map((i) => i + 1))
   const passable = new Set([tiles.tapete, tiles.batente].map((i) => i + 1))
   const chao = map.layers.find((l) => l.name === 'chao')?.data ?? []
   const moveis = map.layers.find((l) => l.name === 'moveis')?.data ?? []
+  const thingAt = (tx: number, ty: number) => (moveis[ty * map.width + tx] ?? 0) & GID_MASK
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
-      const i = ty * map.width + tx
-      const floor = (chao[i] ?? 0) & GID_MASK
-      const thing = (moveis[i] ?? 0) & GID_MASK
-      if (wallTiles.has(floor) || (thing !== 0 && !passable.has(thing))) nav.block({ x: tx * tile, y: ty * tile, w: tile, h: tile })
+      const floor = (chao[ty * map.width + tx] ?? 0) & GID_MASK
+      const thing = thingAt(tx, ty)
+      const sideWallBelow = face.has(floor) && thingAt(tx, ty + 1) === tiles.paredeLado + 1
+      if (floor === top || sideWallBelow || (thing !== 0 && !passable.has(thing))) nav.block({ x: tx * tile, y: ty * tile, w: tile, h: tile })
     }
   }
 
-  // Abaixo do hall tudo é parede, menos o corredor, o chão dos cômodos e as portas.
+  // Abaixo do hall tudo é parede, menos o corredor, o chão dos cômodos e as portas. A parede
+  // de cima de cada cômodo tem um tile de espessura; a linha da face dela já é chão.
   nav.block({ x: 0, y: hallHeight, w: width, h: nav.height - hallHeight })
   nav.open(plan.corridor)
   for (const room of plan.rooms) {
-    nav.open({ x: room.x + tile, y: room.floorY, w: room.w - 2 * tile, h: room.y + room.h - room.floorY })
+    const floorTop = room.y + tile
+    nav.open({ x: room.x + tile, y: floorTop, w: room.w - 2 * tile, h: room.y + room.h - floorTop })
     // A porta ocupa as duas primeiras linhas do chão, na parede do lado do corredor.
     const doorX = room.side === 'esquerda' ? room.x + room.w - tile : room.x
     nav.open({ x: doorX, y: room.floorY, w: tile, h: 2 * tile })

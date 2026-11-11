@@ -2,7 +2,7 @@
   "name": "ceo-de-mentirinha",
   "version": "0.1.0",
   "private": true,
-  "description": "Escritório 2D que mostra as sessões do Claude Code como funcionários. Somente leitura.",
+  "description": "Escritório 3D que mostra as sessões do Claude Code como funcionários. Somente leitura.",
   "main": "./out/main/index.js",
   "scripts": {
     "predev": "node scripts/garantir-electron.mjs",
@@ -18,10 +18,11 @@
   "license": "MIT",
   "dependencies": {
     "chokidar": "^6.0.0",
-    "phaser": "^4.2.1"
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
     "electron": "^45.2.3",
     "electron-vite": "^6.0.0",
     "typescript": "^5.9.3",

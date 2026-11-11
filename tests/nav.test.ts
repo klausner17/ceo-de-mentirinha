@@ -15,7 +15,7 @@ const frame: HouseFrame = {
   frontDoor: { x: 4 * TILE + TILE / 2, y: 3 * TILE }
 }
 const deskSize = { w: 224, h: 176, gap: 16, pad: 16, perRow: 2 }
-const TILES = { paredeTopo: 3, parede: 4, porta: 5, janela: 6, quadro: 14, tapete: 7, batente: 17 }
+const TILES = { paredeTopo: 3, parede: 4, porta: 5, janela: 6, quadro: 14, tapete: 7, batente: 17, paredeLado: 16 }
 const deskRect = (d: { x: number; y: number }): Rect => ({ x: d.x + 60, y: d.y + 46, w: 104, h: 74 })
 
 function house(...desks: number[]) {
@@ -65,6 +65,9 @@ describe('buildNav', () => {
     expect(nav.isFree({ x: 5 * TILE, y: 0.5 * TILE })).toBe(false) // parede de cima
     expect(nav.isFree({ x: 9.5 * TILE, y: 2.5 * TILE })).toBe(false) // estante
     expect(nav.isFree({ x: 5.5 * TILE, y: 4.5 * TILE })).toBe(true) // chão do hall
+    expect(nav.isFree({ x: 5.5 * TILE, y: 1.5 * TILE })).toBe(true) // em frente à janela (a face da parede fica em pé)
+    expect(nav.isFree({ x: 30.5 * TILE, y: 1.5 * TILE })).toBe(false) // onde a parede da Sala do CEO encosta
+    expect(nav.isFree({ x: 0.5 * TILE, y: 1.5 * TILE })).toBe(false) // parede lateral da casa
   })
 
   it('do hall até dentro de um cômodo, o caminho passa pela porta e não atravessa parede nem mesa', () => {
@@ -91,6 +94,13 @@ describe('buildNav', () => {
         for (const o of obstacles) expect(p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h).toBe(false)
       }
     }
+  })
+
+  it('a parede de cima do cômodo tem um tile; a linha da face dela já é chão', () => {
+    const { plan, nav } = house(1, 1)
+    const room = plan.rooms[0]!
+    expect(nav.isFree({ x: room.x + 2.5 * TILE, y: room.y + 0.5 * TILE })).toBe(false)
+    expect(nav.isFree({ x: room.x + 2.5 * TILE, y: room.y + 1.5 * TILE })).toBe(true)
   })
 
   it('a parede entre dois cômodos vizinhos não tem passagem direta', () => {

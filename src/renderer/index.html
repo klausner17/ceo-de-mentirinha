@@ -44,12 +44,48 @@
       #details a:hover { color: #e8c35b; }
       #details .close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: #9aa1b2; font-size: 20px; line-height: 1; cursor: pointer; padding: 4px 8px; }
       #details .close:hover { color: #e8e6e3; }
+      #game { overflow: hidden; }
+      #game canvas.mundo { display: block; position: absolute; inset: 0; }
+      #game .rotulos { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+      kbd { display: inline-block; font: 600 11px ui-monospace, Menlo, monospace; background: #2c2f3a; color: #e8e6e3; border: 1px solid #4a4f5e; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+      #hint { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 4; background: #15161cf2; border: 1px solid #e8c35b; border-radius: 999px; padding: 6px 14px; font-size: 13px; white-space: nowrap; pointer-events: none; }
+      #hint[hidden] { display: none; }
+      #help { position: absolute; left: 12px; bottom: 12px; z-index: 3; color: #9aa1b2; font-size: 11px; background: #15161ccc; border-radius: 6px; padding: 4px 8px; pointer-events: none; }
+      .ancora { pointer-events: none; }
+      .rotulo { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; white-space: nowrap; user-select: none; scale: var(--z, 1); }
+      .rotulo.clicavel { pointer-events: auto; cursor: pointer; }
+      .rotulo.placa { width: 196px; box-sizing: border-box; background: #1d1f27b8; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px 5px; position: relative; }
+      .rotulo.placa.hover { background: #1d1f27e6; border-color: #9aa1b2; }
+      .rotulo.placa.selecionada { background: #1d1f27e6; border: 2px solid #e8c35b; }
+      .rotulo.placa .titulo { font-size: 13px; font-weight: 700; color: #e8e6e3; overflow: hidden; text-overflow: ellipsis; }
+      .rotulo.placa .linha { font-size: 11px; color: #9aa1b2; overflow: hidden; text-overflow: ellipsis; }
+      .rotulo.placa .chips { position: absolute; right: 4px; top: -15px; display: flex; gap: 4px; }
+      .rotulo.placa .chips span { font-size: 10px; font-weight: 700; color: #1d1f27; padding: 1px 4px; border-radius: 3px; }
+      .rotulo.balao { font-size: 12px; color: #1d1f27; padding: 3px 7px; border-radius: 8px; box-shadow: 0 2px 6px #0006; }
+      .rotulo.balao[hidden] { display: none; }
+      .rotulo.liderado { font-size: 9px; color: #e8e6e3; background: #1d1f27aa; padding: 1px 3px; border-radius: 3px; }
+      .rotulo.officeboy { font-size: 9px; color: #1d1f27; background: #e8b923; padding: 1px 3px; border-radius: 3px; }
+      .rotulo.fila { font-size: 10px; color: #e8e6e3; background: #1d1f27cc; padding: 1px 4px; border-radius: 3px; }
+      .rotulo.voce { font-size: 11px; font-weight: 700; color: #1d1f27; background: #e8c35b; padding: 1px 6px; border-radius: 999px; box-shadow: 0 2px 6px #0006; }
+      .rotulo.placa-hall { font-size: 11px; font-weight: 700; color: #1d1f27; background: #e8b923; padding: 1px 5px; border-radius: 3px; }
+      .rotulo.placa-hall.ceo { font-size: 13px; background: #e8c35b; }
+      .rotulo.placa-ala { font-size: 14px; font-weight: 700; color: #1d1f27; background: #e8c35b; padding: 2px 8px; border-radius: 4px; box-shadow: 0 2px 6px #0006; }
+      .rotulo.placa-ala.livre { background: #9aa1b2; }
+      .rotulo.placa-ala .pessoas { margin-left: 8px; font-weight: 400; font-size: 12px; }
+      .rotulo.contador { min-width: 14px; text-align: center; font-size: 12px; font-weight: 700; color: #fff; background: #d7263d; border: 2px solid #fff; border-radius: 999px; padding: 1px 4px; animation: pulsa 1s ease-in-out infinite alternate; }
+      .rotulo.contador[hidden] { display: none; }
+      @keyframes pulsa { from { scale: 1; } to { scale: 1.15; } }
+      .rotulo.festa { font-size: 12px; font-weight: 700; color: #1d1f27; padding: 3px 7px; border-radius: 4px; }
+      .rotulo.festa.grande { font-size: 15px; }
+      .rotulo.vazia { font-size: 18px; color: #9aa1b2; white-space: normal; width: 360px; text-align: center; }
     </style>
   </head>
   <body>
     <div id="app">
       <div id="game">
         <aside id="details" aria-live="polite" hidden></aside>
+        <div id="hint" hidden></div>
+        <div id="help"><kbd>WASD</kbd> anda · <kbd>Shift</kbd> corre · <kbd>E</kbd> abre · arraste gira · roda aproxima</div>
       </div>
       <div id="log" aria-label="Log do escritório"></div>
     </div>
