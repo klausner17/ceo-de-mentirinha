@@ -1,9 +1,23 @@
 # CEO de Mentirinha
 
-Um escritório 2D em que cada sessão do Claude Code é um funcionário na sua mesa. Você é o
-CEO: olha o escritório e entende o que cada agente está fazendo, sem ler log.
+Um escritório 3D em que cada sessão do Claude Code é um funcionário na sua mesa. Você é o
+CEO: anda pela casa, passa pelas mesas e entende o que cada agente está fazendo, sem ler log.
 
-![Escritório no modo demo](docs/escritorio-demo.png)
+![Escritório 3D no modo demo](docs/escritorio-3d.png)
+
+## Controles
+
+| Tecla ou mouse | O que faz |
+| --- | --- |
+| `W` `A` `S` `D` ou setas | anda (para onde a câmera olha) |
+| `Shift` | corre |
+| `E`, `Enter` ou espaço | abre o que está perto: a mesa, o computador do CEO (caixa de entrada) ou o quadro de entregas |
+| clique | abre a mesa, a placa da ala, o computador ou o quadro |
+| arrastar | gira a câmera |
+| roda do mouse | aproxima e afasta |
+| `Esc` | fecha o painel |
+
+![CEO na frente de uma mesa, com o painel aberto](docs/ceo-andando-3d.png)
 
 A v1 é **somente leitura**: só lê os arquivos que o Claude Code já grava em `~/.claude`,
 não envia prompts, não usa chave de API e não manda nada pela rede.
@@ -27,7 +41,7 @@ Outros comandos:
 | `npm run build` | build de produção em `out/` |
 | `npm start` | roda o build de produção |
 | `npm run inspect` | Fase 0: mostra a estrutura dos seus transcripts (só nomes de campos, nunca conteúdo) |
-| `npm run arte` | Fase 6: gera de novo a pixel art e o mapa do hall a partir de `scripts/gerar-arte.mjs` |
+| `npm run arte` | Fase 6: gera de novo a pixel art (usada como textura no 3D) e o mapa do hall a partir de `scripts/gerar-arte.mjs` |
 
 Variáveis de ambiente:
 
@@ -42,10 +56,12 @@ Variáveis de ambiente:
 
 | No jogo | No Claude Code |
 | --- | --- |
-| Casa | o escritório é uma casa: o hall de entrada em cima e um corredor central descendo dele, com os cômodos dos dois lados |
+| Você | o CEO de terno azul e gravata dourada, com a etiqueta "você"; anda pela casa e não atravessa paredes nem móveis |
+| Casa | o escritório é uma casa em 3D (Three.js): o hall de entrada em cima e um corredor central descendo dele, com os cômodos dos dois lados |
 | Hall de entrada | mapa do Tiled (`assets/mapa/escritorio.json`): porta da rua, estante de skills, fichário, café e a Sala do CEO (você), ligada ao hall por uma porta |
 | Ala (cômodo) | projeto (`cwd`), com uma porta para o corredor; com número ímpar de projetos, o último par ganha uma sala livre |
 | Mesa | sessão ativa, ordenada por branch dentro da ala |
+| Funcionário | sentado de costas para a câmera, olhando o monitor (você vê a tela por cima do ombro) |
 | Cor da roupa | modelo: Opus = diretor (roxo), Sonnet = pleno (azul), Haiku = júnior (verde-água) |
 | Pose e monitor | ferramenta em uso: digitando (Edit, Bash), lendo uma pasta (Read, Web), lupa (Grep, Glob), apontando (Agent) |
 | Balão acima da cabeça | nome da ferramenta em uso; MCP aparece como "Office boy" |
@@ -72,13 +88,13 @@ Os dados andam em uma direção só, dos arquivos até a tela:
 3. `src/main/parser.ts` é o único módulo que conhece o formato dos transcripts.
 4. `src/main/office-store.ts` mantém o estado das sessões e emite só o que mudou.
 5. `src/preload/index.ts` expõe `window.office` ao renderer por IPC.
-6. `src/renderer/` desenha o escritório com Phaser e nunca lê arquivos.
+6. `src/renderer/` desenha o escritório em 3D com Three.js e nunca lê arquivos.
 
 ```
 src/
   main/        watcher, leitor incremental, parser, estado das sessões, IPC
   preload/     ponte segura entre main e renderer
-  renderer/    Phaser: cena do escritório e mesas
+  renderer/    Three.js: casa 3D, mesas, CEO andando (src/renderer/src/world)
   shared/      tipos usados pelos dois lados
 fixtures/      transcripts sintéticos para os testes
 scripts/       inspeção da Fase 0 e gerador da arte

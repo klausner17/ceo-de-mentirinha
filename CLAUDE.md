@@ -1,6 +1,6 @@
 # CEO de Mentirinha
 
-App Electron + Phaser que mostra as sessões do Claude Code como funcionários num escritório.
+App Electron + Three.js (3D) que mostra as sessões do Claude Code como funcionários num escritório.
 Textos, comentários e docs em português.
 
 - Antes de commitar: `npm run typecheck && npm test && npm run build`.

@@ -1,7 +1,7 @@
 // A planta da casa: o hall em cima e, descendo dele, um corredor central com os cômodos
 // (um por projeto) dos dois lados. Cada cômodo tem uma porta para o corredor, e os
 // liderados andam da porta da rua até a mesa passando pelo hall, pelo corredor e por ela.
-// Só faz contas: não depende do Phaser, para dar para testar.
+// Só faz contas: não depende do Three.js, para dar para testar.
 
 export interface Point {
   x: number

@@ -1,10 +1,9 @@
-import Phaser from 'phaser'
 import type { OfficeDelta, SessionState } from '@shared/types'
 import type { Deliverables } from '@shared/types'
 import { ago, cut, deskLine, deliverablesSummary, doing, newDeliveries, prLabel, roomKey, roomPeople, sessionDetails, sessionTitle, shortPath } from './describe'
 import { board, boardLines } from './entregas'
 import { emailKey, emailSubject, inbox, unreadCount } from './inbox'
-import { OfficeScene, type Selection } from './scenes/OfficeScene'
+import { Office3D, type Selection } from './world/office'
 
 const logEl = document.getElementById('log')!
 const detailsEl = document.getElementById('details')!
@@ -24,16 +23,9 @@ function describe(s: SessionState): string {
   return `${sessionTitle(s)} (${s.project}): ${doing(s, Date.now())}`
 }
 
-const scene = new OfficeScene()
-
-new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  backgroundColor: '#1d1f27',
-  pixelArt: true,
-  scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
-  scene
-})
+const scene = new Office3D(document.getElementById('game')!, document.getElementById('hint')!)
+scene.start().catch((err: Error) => log('error', `Falha ao montar o escritório 3D: ${err.message}`))
+log('info', 'Você é o CEO: ande com WASD ou as setas (Shift corre), chegue perto de uma mesa e aperte E. Arraste para girar a câmera.')
 
 const known = new Map<string, SessionState>()
 
