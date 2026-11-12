@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { planHouse, type HouseFrame } from '../src/renderer/src/house'
+import { planHouse, teamObstacle, teamSpots, type HouseFrame } from '../src/renderer/src/house'
 import { buildNav, NavGrid, type HallMap, type Rect } from '../src/renderer/src/nav'
 
 const TILE = 32
@@ -20,7 +20,7 @@ const deskRect = (d: { x: number; y: number }): Rect => ({ x: d.x + 60, y: d.y +
 
 function house(...desks: number[]) {
   const plan = planHouse(frame, desks.map((n, i) => ({ key: `p${i}`, name: `p${i}`, desks: n })), deskSize)
-  const obstacles = plan.rooms.flatMap((r) => r.desks.map(deskRect))
+  const obstacles = [...plan.rooms.flatMap((r) => r.desks.map(deskRect)), ...plan.rooms.flatMap((r) => (r.team ? [teamObstacle(r.team)] : []))]
   const nav = buildNav({ map, tiles: TILES, tile: TILE, width: frame.width, hallHeight: frame.hallHeight, plan, obstacles })
   return { plan, nav, obstacles }
 }
@@ -113,5 +113,19 @@ describe('buildNav', () => {
     const path = nav.findPath(a, b)!
     expectWalkable(nav, a, path)
     expect(Math.min(...path.map((p) => p.y))).toBeLessThan(left!.floorY + 2 * TILE)
+  })
+
+  it('todo lugar da mesa da equipe dá para alcançar a partir do hall, sem atravessar móvel', () => {
+    const { plan, nav } = house(3, 1)
+    const from = { x: 7 * TILE, y: 4 * TILE }
+    for (const room of plan.rooms.filter((r) => r.team)) {
+      for (const spot of teamSpots(room.team!)) {
+        const path = nav.findPath(from, spot)!
+        expect(path).not.toBeNull()
+        expectWalkable(nav, from, path)
+        // O último trecho (da célula livre até a cadeira) é curto: a cadeira fica rente à grade livre.
+        expect(Math.hypot(path.at(-1)!.x - spot.x, path.at(-1)!.y - spot.y)).toBeLessThan(TILE)
+      }
+    }
   })
 })

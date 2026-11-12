@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planHouse, type HouseFrame } from '../src/renderer/src/house'
+import { planHouse, TEAM, teamObstacle, teamSpots, type HouseFrame } from '../src/renderer/src/house'
 
 const TILE = 32
 const frame: HouseFrame = { tile: TILE, width: 40 * TILE, hallHeight: 6 * TILE, corridor: { x: 18 * TILE, w: 4 * TILE }, frontDoor: { x: 136, y: 104 } }
@@ -60,5 +60,48 @@ describe('planHouse', () => {
     }
     expect(left!.door.x).toBeGreaterThan(left!.x + left!.w - TILE)
     expect(right!.door.x).toBeLessThan(right!.x + TILE)
+  })
+
+  it('cada cômodo com projeto tem uma mesa da equipe embaixo das mesas, dentro do cômodo', () => {
+    const plan = planHouse(frame, rooms(3, 1), desk)
+    for (const room of plan.rooms) {
+      const t = teamObstacle(room.team!)
+      for (const d of room.desks) expect(t.y).toBeGreaterThan(d.y + desk.h)
+      expect(t.x).toBeGreaterThanOrEqual(room.x + TILE)
+      expect(t.x + t.w).toBeLessThanOrEqual(room.x + room.w - TILE)
+      // Sobra lugar para as cadeiras e para passar embaixo dela.
+      for (const s of teamSpots(room.team!)) expect(s.y).toBeLessThan(room.y + room.h - 8)
+    }
+    expect(planHouse(frame, rooms(1), desk).rooms[1]!.team).toBeNull()
+  })
+})
+
+describe('teamSpots', () => {
+  const c = { x: 300, y: 500 }
+  const spots = teamSpots(c)
+
+  it('enche primeiro as cadeiras do lado de cima, do meio para as pontas, e depois as de baixo', () => {
+    const seats = spots.filter((s) => s.sit)
+    expect(seats).toHaveLength(TEAM.perSide * 2)
+    expect(spots.slice(0, seats.length).every((s) => s.sit)).toBe(true)
+    const top = seats.slice(0, TEAM.perSide)
+    expect(top.every((s) => s.y < c.y)).toBe(true)
+    expect(seats.slice(TEAM.perSide).every((s) => s.y > c.y)).toBe(true)
+    const dist = top.map((s) => Math.abs(s.x - c.x))
+    expect(dist).toEqual([...dist].sort((a, b) => a - b))
+  })
+
+  it('ninguém fica dentro do tampo, todo mundo olha para a mesa e não há dois no mesmo lugar', () => {
+    const t = teamObstacle(c)
+    const keys = new Set(spots.map((s) => `${s.x},${s.y}`))
+    expect(keys.size).toBe(spots.length)
+    for (const s of spots) {
+      const inside = s.x > t.x && s.x < t.x + t.w && s.y > t.y && s.y < t.y + t.h
+      expect(inside).toBe(false)
+      // Olhar para `face` é olhar na direção do tampo.
+      const fx = s.face.x - s.x
+      const fy = s.face.y - s.y
+      expect(Math.sign(fx) * Math.sign(c.x - s.x) >= 0 && Math.sign(fy) * Math.sign(c.y - s.y) >= 0).toBe(true)
+    }
   })
 })

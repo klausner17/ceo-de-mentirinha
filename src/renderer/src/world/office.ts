@@ -8,12 +8,13 @@ import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import type { SessionState } from '@shared/types'
 import { loadArt, mapa, TILE, TILES } from '../art'
 import { buildNav, type HallMap, type NavGrid, type Rect } from '../nav'
-import { planHouse, type HouseFrame, type HousePlan, type Room, type Point } from '../house'
+import { planHouse, teamObstacle, type HouseFrame, type HousePlan, type Room, type Point } from '../house'
 import { roomKey, roomPeople, sessionTitle } from '../describe'
 import { canStand, direction, nearest, walk } from '../move'
 import { Desk, DESK_H, DESK_W } from './desk'
 import { OfficeBoys } from './office-boys'
 import { Person } from './person'
+import { TeamTable } from './team-table'
 import { at3, box, Clock, dispose, label, mat, Textures, U, WALL_H } from './kit'
 import { turnTowards } from './walker'
 
@@ -53,6 +54,8 @@ interface Reachable {
 export class Office3D {
   private readonly sessions = new Map<string, SessionState>()
   private readonly desks = new Map<string, Desk>()
+  /** A mesa da equipe de cada cômodo, pela chave do projeto. */
+  private readonly tables = new Map<string, TeamTable>()
   private readonly clock = new Clock()
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400)
@@ -751,7 +754,11 @@ export class Office3D {
       width,
       hallHeight: this.frame.hallHeight,
       plan,
-      obstacles: [...this.hallObstacles, ...plan.rooms.flatMap((r) => r.desks.map(deskObstacle))]
+      obstacles: [
+        ...this.hallObstacles,
+        ...plan.rooms.flatMap((r) => r.desks.map(deskObstacle)),
+        ...plan.rooms.flatMap((r) => (r.team ? [teamObstacle(r.team)] : []))
+      ]
     })
     this.boys?.setNav(this.nav)
     // Uma mesa nova apareceu onde o CEO estava: ele dá um passo para o lado.
@@ -763,8 +770,27 @@ export class Office3D {
       }
     }
 
+    // Mesas da equipe: uma por cômodo com projeto; somem junto com o cômodo.
+    const rooms = new Map(plan.rooms.flatMap((r) => (r.key && r.team ? [[r.key, r.team] as const] : [])))
+    for (const [k, table] of this.tables) {
+      if (!rooms.has(k)) {
+        table.dispose()
+        this.tables.delete(k)
+      }
+    }
+    for (const [k, at] of rooms) {
+      const table = this.tables.get(k)
+      if (table) table.moveTo(at)
+      else {
+        const t = new TeamTable(at)
+        this.world.add(t.root)
+        this.tables.set(k, t)
+      }
+    }
+
     for (const room of plan.rooms) {
       const list = room.key ? byProject.get(room.key)! : []
+      const table = room.key ? (this.tables.get(room.key) ?? null) : null
       list.forEach((s, i) => {
         const at = room.desks[i]!
         let desk = this.desks.get(s.id)
@@ -779,7 +805,9 @@ export class Office3D {
         }
         desk.setRoute(room.route)
         desk.setNav(this.nav!)
+        desk.setTable(table)
         desk.moveTo(at.x, at.y)
+        desk.retarget()
         desk.update(s)
       })
     }
