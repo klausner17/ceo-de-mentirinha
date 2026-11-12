@@ -413,8 +413,8 @@ export class Office3D {
             break
           }
           case TILES.batente:
-            // Vão de porta: só a verga em cima (uma por porta, no tile de cima).
-            if (tileAt(moveis, tx, ty - 1) !== TILES.batente) hall.add(box(1, 0.3, 2, mat(wallColor), [cx, WALL_H - 0.15, ty + 1]))
+            // Vão de porta: fica aberto até o teto. Uma verga em cima esconderia o CEO
+            // passando pela porta e pareceria que ele está em cima da parede.
             break
           case TILES.estante:
             hall.add(this.cabinet(cx, ty, 1.25, g))
@@ -664,9 +664,8 @@ export class Office3D {
     const outerX = room.side === 'esquerda' ? x : x + w - 1
     const innerX = room.side === 'esquerda' ? x + w - 1 : x
     group.add(this.wall(outerX, top, 1, floorH, null))
-    // Porta para o corredor: vão nas duas primeiras linhas do chão, com a verga em cima.
+    // Porta para o corredor: vão aberto (sem verga) nas duas primeiras linhas do chão.
     if (floorY > top) group.add(this.wall(innerX, top, 1, floorY - top, null))
-    group.add(box(1, 0.3, 2, mat(wallColor), [innerX + 0.5, WALL_H - 0.15, floorY + 1]))
     const below = y + h - (floorY + 2)
     if (below > 0) group.add(this.wall(innerX, floorY + 2, 1, below, null))
     // Capacho no corredor, em frente à porta.
