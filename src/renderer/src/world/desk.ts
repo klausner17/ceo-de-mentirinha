@@ -1,5 +1,6 @@
 // Uma mesa em 3D: funcionário sentado de costas para a câmera (olhando o monitor), pilha de
-// papel, post-its, café, balão da ferramenta, plaquinha com o nome e os liderados em volta.
+// papel, post-its, café, balão da ferramenta e plaquinha com o nome. Os liderados vão sentar
+// na mesa da equipe do cômodo (team-table.ts); com ela cheia, ficam de pé ao lado do chefe.
 
 import * as THREE from 'three'
 import type { Deliverables, SessionState, SubagentState } from '@shared/types'
@@ -11,6 +12,7 @@ import { CHIP_COLORS, deliverableChips, deskLine, newDeliveries, sessionTitle } 
 import { describeTool } from '../tools'
 import { Person, type Look } from './person'
 import { box, Clock, dispose, easeBack, easeOut, itemSprite, label, mat, U, type Textures } from './kit'
+import type { TeamTable } from './team-table'
 import { pathTo, turnTowards, Walk } from './walker'
 
 /** Tamanho do lugar de uma mesa no plano da casa, em pixels (as contas de house.ts usam). */
@@ -36,12 +38,24 @@ export const DESK_FRONT = { x: CX, y: 156 }
 const p3 = (x: number, y: number, h = 0): [number, number, number] => [x * U, h, y * U]
 
 interface Subordinate {
+  id: string
   person: Person
   tag: HTMLDivElement
   arrived: boolean
+  /** Lugar na mesa da equipe, ou null quando ela está cheia. */
+  seat: number | null
+  /** Lugar de pé ao lado do chefe (usado só sem lugar na mesa da equipe). */
   slot: number
+  /** Para onde ele foi andando por último (para saber se precisa andar de novo). */
+  goal: Point | null
   walk: Walk | null
   working: boolean
+}
+
+/** Onde o liderado fica: o ponto, se senta e para onde olha. */
+interface Place extends Point {
+  sit: boolean
+  face: Point
 }
 
 export class Desk {
@@ -60,6 +74,7 @@ export class Desk {
   private readonly postits = new THREE.Group()
   private readonly ring: THREE.Mesh
   private readonly team = new Map<string, Subordinate>()
+  private table: TeamTable | null = null
   private chipsKey = ''
   private delivered: Deliverables | null = null
   private screenState: Screen = 'desligado'
@@ -215,11 +230,12 @@ export class Desk {
       sub.walk?.update(dt)
       if (sub.walk?.done) sub.walk = null
       if (sub.arrived && !sub.walk) {
-        // Parado ao lado do chefe, virado para a mesa.
-        const tx = (this.x + TABLE.x) * U - sub.person.root.position.x
-        const tz = (this.y + TABLE.y) * U - sub.person.root.position.z
-        turnTowards(sub.person.root, tx, tz, dt, 6)
-        sub.person.setPose(sub.working ? 'prancheta' : 'parado')
+        // No lugar: sentado na mesa da equipe (ou de pé ao lado do chefe), virado para a mesa.
+        const place = this.placeOf(sub)
+        turnTowards(sub.person.root, place.face.x * U - sub.person.root.position.x, place.face.y * U - sub.person.root.position.z, dt, 6)
+        if (place.sit) sub.person.setPose(sub.working ? 'digitando' : 'sentado')
+        else sub.person.setPose(sub.working ? 'prancheta' : 'parado')
+        if (sub.seat !== null) this.table?.setSeated(sub.seat, place.sit)
       }
       sub.person.update(dt)
     }
@@ -253,8 +269,28 @@ export class Desk {
     const to = new THREE.Vector3(x * U, 0, y * U)
     this.stopMove?.()
     this.stopMove = this.clock.tween(0.3, (k) => this.root.position.lerpVectors(from, to, k), undefined, easeOut)
-    // Os liderados acompanham a mesa.
-    for (const sub of this.team.values()) if (sub.arrived) this.walkSub(sub, this.slot(sub.slot))
+    this.retarget()
+  }
+
+  /** A mesa da equipe do cômodo onde esta mesa está. */
+  setTable(table: TeamTable | null): void {
+    if (table === this.table) return
+    for (const sub of this.team.values()) {
+      if (sub.seat !== null) this.table?.release(sub.id)
+      sub.seat = table?.claim(sub.id) ?? null
+    }
+    this.table = table
+    this.retarget()
+  }
+
+  /** Quem já chegou e teve o lugar mudado (a mesa ou o cômodo andou) vai andando até o novo. */
+  retarget(): void {
+    for (const sub of this.team.values()) {
+      if (!sub.arrived) continue
+      const place = this.placeOf(sub)
+      if (sub.goal && sub.goal.x === place.x && sub.goal.y === place.y) continue
+      this.walkSub(sub, place)
+    }
   }
 
   update(s: SessionState): void {
@@ -440,14 +476,20 @@ export class Desk {
     }
   }
 
-  /** Posição (no plano) de cada liderado em volta da mesa, do lado esquerdo. */
+  /** Posição (no plano) de pé ao lado do chefe, do lado esquerdo da mesa. */
   private slot(i: number): Point {
     const col = i % 2
     const row = Math.floor(i / 2)
     return { x: this.x + 18 + col * 26, y: this.y + 64 + row * 30 }
   }
 
-  /** Liderados entram pela porta da rua, atravessam a casa até o chefe e saem ao terminar. */
+  /** Lugar do liderado: na mesa da equipe, se tiver; senão, de pé ao lado do chefe. */
+  private placeOf(sub: Subordinate): Place {
+    if (sub.seat !== null && this.table) return this.table.spot(sub.seat)
+    return { ...this.slot(sub.slot), sit: false, face: { x: this.x + TABLE.x, y: this.y + TABLE.y } }
+  }
+
+  /** Liderados entram pela porta da rua, atravessam a casa até a mesa da equipe e saem ao terminar. */
   private updateTeam(subagents: SubagentState[]): void {
     const alive = new Set(subagents.map((a) => a.id))
     for (const [id, sub] of this.team) {
@@ -470,10 +512,15 @@ export class Desk {
         tag.obj.position.set(0, 1.55, 0)
         person.root.add(tag.obj)
         this.world.add(person.root)
-        const s: Subordinate = { person, tag: tag.el, arrived: false, slot, walk: null, working: false }
+        const seat = this.table?.claim(a.id) ?? null
+        const s: Subordinate = { id: a.id, person, tag: tag.el, arrived: false, seat, slot, goal: null, walk: null, working: false }
         sub = s
         this.team.set(a.id, s)
-        this.walkSub(s, this.slot(slot), () => (s.arrived = true), this.route.slice(1))
+        this.walkSub(s, this.placeOf(s), () => (s.arrived = true), this.route.slice(1))
+      } else if (sub.seat === null && this.table) {
+        // Vagou um lugar na mesa da equipe: quem estava de pé vai sentar.
+        sub.seat = this.table.claim(a.id)
+        if (sub.seat !== null && sub.arrived) this.walkSub(sub, this.placeOf(sub))
       }
       sub.working = a.currentTool !== null
     }
@@ -486,7 +533,14 @@ export class Desk {
   private walkSub(sub: Subordinate, to: Point, done?: () => void, fallback: Point[] = []): void {
     const from = { x: sub.person.root.position.x / U, y: sub.person.root.position.z / U }
     sub.person.setPose('andando')
-    sub.walk = new Walk(sub.person.root, pathTo(this.nav, from, to, fallback), WALK_SPEED, () => {
+    sub.goal = { x: to.x, y: to.y }
+    if (sub.seat !== null) this.table?.setSeated(sub.seat, false)
+    // A grade termina no centro da célula livre mais próxima; o último passo vai até o ponto exato
+    // (a cadeira fica rente à mesa da equipe).
+    const path = pathTo(this.nav, from, to, fallback)
+    const last = path[path.length - 1]
+    if (!last || last.x !== to.x || last.y !== to.y) path.push({ x: to.x, y: to.y })
+    sub.walk = new Walk(sub.person.root, path, WALK_SPEED, () => {
       sub.person.setPose('parado')
       done?.()
     })
@@ -494,6 +548,8 @@ export class Desk {
 
   private leaveThroughDoor(sub: Subordinate): void {
     sub.arrived = false
+    this.table?.release(sub.id)
+    sub.seat = null
     const exit = this.route[0] ?? { x: sub.person.root.position.x / U, y: sub.person.root.position.z / U }
     // Continua andando e se atualizando pelo relógio até sair pela porta da rua.
     this.walkSub(sub, exit, () => {

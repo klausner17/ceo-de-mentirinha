@@ -70,7 +70,7 @@ Variáveis de ambiente:
 | Suor, café e papel rosado | contexto acima de 80% do limite |
 | Monitor vermelho, papel amassado e fumaça | uma ferramenta voltou com erro |
 | Dormindo com Z | sem escrita há `CEO_IDLE_MINUTES` |
-| Liderados | subagentes: entram pela porta da rua, atravessam o hall e o corredor, entram pela porta da ala, ficam ao lado do chefe e fazem o caminho de volta ao terminar |
+| Liderados | subagentes: entram pela porta da rua, atravessam o hall e o corredor, entram pela porta da ala, sentam na mesa da equipe do cômodo (8 cadeiras com notebook; cheia, os próximos ficam de pé nas pontas e depois ao lado do chefe) e fazem o caminho de volta ao terminar |
 | Office boys na portaria | chamadas a conectores MCP: cada chamada sai da mesa e entra na fila do servidor na portaria. Volta com envelope se deu certo, ou de mãos vazias e perdido se falhou |
 | Plaquinhas coloridas acima do nome | entregas da sessão e dos ajudantes: PR (verde), commits (azul) e artefatos (lilás: arquivos criados e páginas publicadas) |
 | Confete e "PR #12 aberto!" | a sessão acabou de abrir um PR; commit e artefato novo também sobem um aviso menor |
